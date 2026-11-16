@@ -145,7 +145,12 @@ internal static class Verification
                 var recycleItem = assembly.GetType("DiskBubbles.RecycleItem");
                 var prepare = recycleItem.GetMethod("Prepare", BindingFlags.Static | BindingFlags.NonPublic);
                 var move = recycleItem.GetMethod("MoveAsync", BindingFlags.Static | BindingFlags.NonPublic);
-                var readSnapshot = assembly.GetType("DiskBubbles.ShellRecycle").GetMethod("ReadSnapshot");
+                var shellRecycle = assembly.GetType("DiskBubbles.ShellRecycle");
+                var readSnapshot = shellRecycle.GetMethod("ReadSnapshot");
+                var isSelectedPath = shellRecycle.GetMethod("IsSelectedPath", BindingFlags.Static | BindingFlags.NonPublic);
+                Assert((bool)isSelectedPath.Invoke(null, new object[] { @"C:\Samples\Report.pdf", @"C:\samples\Report.pdf" }) &&
+                    !(bool)isSelectedPath.Invoke(null, new object[] { @"C:\Samples\Report.pdf", @"C:\Samples\REPORT.PDF" }),
+                    "The recycle guard accepted a different selected filename.");
                 AssertThrowsIOException(() => readSnapshot.Invoke(null, new[] { Path.Combine(fixture, "Report.pdf."), report }), "different path");
                 AssertThrowsIOException(() => readSnapshot.Invoke(null, new[] { Path.Combine(fixture, "NUL.txt"), report }), "different path");
                 AssertThrowsIOException(() => readSnapshot.Invoke(null, new[] { @"\\server\share\Report.pdf", report }), "local Windows drive");

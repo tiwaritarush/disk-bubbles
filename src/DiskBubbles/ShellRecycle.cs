@@ -44,7 +44,7 @@ namespace DiskBubbles
                 string fullPath = buffer.ToString();
                 if (fullPath.StartsWith(@"\\?\", StringComparison.Ordinal))
                     fullPath = fullPath.Substring(4);
-                if (!string.Equals(path, fullPath, StringComparison.OrdinalIgnoreCase))
+                if (!IsSelectedPath(path, fullPath))
                     throw new IOException("This location resolves through a link or alias. Scan the actual folder to review it.");
                 if (SystemProtection.ForPath(fullPath) != EntryProtection.None)
                     throw new IOException("This location is protected.");
@@ -56,6 +56,10 @@ namespace DiskBubbles
                 return new EntrySnapshot(fullPath, identity, info.Creation, info.Write);
             }
         }
+
+        private static bool IsSelectedPath(string requested, string resolved) =>
+            string.Equals(requested, resolved, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(Path.GetFileName(requested), Path.GetFileName(resolved), StringComparison.Ordinal);
 
         private static void VerifyShellPath(string path)
         {
