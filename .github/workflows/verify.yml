@@ -1,0 +1,25 @@
+name: Windows verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Build the Windows executable
+        shell: pwsh
+        run: .\Build.ps1
+      - name: Run the disposable verification fixture
+        shell: pwsh
+        run: .\Verify.ps1
