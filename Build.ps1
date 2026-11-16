@@ -20,6 +20,7 @@ $sources = @('App.cs', 'Appearance.cs', 'UiMotion.cs', 'MainWindow.cs', 'MainWin
 $resources = @('Theme.xaml', 'Dark.xaml', 'Light.xaml') | ForEach-Object {
     "/resource:$(Join-Path $sourceRoot $_),DiskBubbles.$_"
 }
+$resources += "/resource:$(Join-Path $PSScriptRoot 'LICENSE'),DiskBubbles.LICENSE"
 $manifest = Join-Path $sourceRoot 'app.manifest'
 $icon = Join-Path $sourceRoot 'DiskBubbles.ico'
 $output = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputPath)
