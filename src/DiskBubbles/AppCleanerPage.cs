@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -9,7 +10,6 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Media;
 
 namespace DiskBubbles
 {
@@ -25,7 +25,7 @@ namespace DiskBubbles
         private readonly TextBlock _scanDetail = Label("", 15, "Muted");
         private readonly ProgressBar _scanMeter = new ProgressBar { Width = 280, Height = 5, Margin = new Thickness(0, 20, 0, 0) };
         private readonly Button _scanAction = new Button { Margin = new Thickness(0, 22, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
-        private readonly ListBox _list = new ListBox { BorderThickness = new Thickness(0), Background = Brushes.Transparent };
+        private readonly ListBox _list = new ListBox();
         private readonly TextBox _search = new TextBox { Width = 280, HorizontalAlignment = HorizontalAlignment.Left, VerticalContentAlignment = VerticalAlignment.Center };
         private readonly Button _refresh = new Button { Content = "Scan apps" };
         private readonly Button _leftoverMode = new Button { Content = "Leftovers" };
@@ -143,9 +143,8 @@ namespace DiskBubbles
             DockPanel.SetDock(tableHeader, Dock.Top);
             table.Children.Add(tableHeader);
 
+            _list.Style = (Style)FindResource("AppResults");
             _list.ItemContainerStyle = (Style)FindResource("EntryRow");
-            _list.SetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Disabled);
-            _list.SetValue(VirtualizingPanel.VirtualizationModeProperty, VirtualizationMode.Recycling);
             AutomationProperties.SetName(_list, "App Cleaner results");
             table.Children.Add(_list);
             columns.Children.Add(UiVisuals.FrostedPane(table));
@@ -272,11 +271,23 @@ namespace DiskBubbles
             object selected = _list.SelectedItem;
             _list.ItemTemplate = (DataTemplate)FindResource(_showLeftovers ? "AppLeftover" : "AppRow");
             _list.ItemsSource = _showLeftovers ? (System.Collections.IEnumerable)_leftovers.Where(item => Matches(item.Name) || Matches(item.Location)).ToList()
-                : _apps.Where(item => Matches(item.Name) || Matches(item.Publisher)).ToList();
+                : new ObservableCollection<InstalledApp>(_apps.Where(item => Matches(item.Name) || Matches(item.Publisher)));
             if (selected != null && _list.Items.Contains(selected)) _list.SelectedItem = selected;
-            _leftoverMode.Content = _showLeftovers ? "Installed apps" : $"Leftovers ({_leftovers.Count:N0})";
+            UpdateLeftoverButton();
             UpdateActions();
         }
+
+        private void RemoveInstalledApp(InstalledApp app)
+        {
+            _apps.Remove(app);
+            app.Marked = false;
+            if (_list.ItemsSource is ObservableCollection<InstalledApp> visible)
+                visible.Remove(app);
+            UpdateActions();
+        }
+
+        private void UpdateLeftoverButton() =>
+            _leftoverMode.Content = _showLeftovers ? "Installed apps" : $"Leftovers ({_leftovers.Count:N0})";
 
         private InstalledApp[] SelectedApps() => _apps.Any(app => app.Marked) ? _apps.Where(app => app.Marked).ToArray()
             : _list.SelectedItem is InstalledApp selected && !selected.Locked ? new[] { selected } : Array.Empty<InstalledApp>();
@@ -377,7 +388,6 @@ namespace DiskBubbles
                         if (result == AppUninstallResult.RestartRequired)
                         {
                             restart++;
-                            app.Marked = false;
                             continue;
                         }
                         if (result != AppUninstallResult.Removed)
@@ -387,7 +397,7 @@ namespace DiskBubbles
                         }
 
                         removed++;
-                        app.Marked = false;
+                        RemoveInstalledApp(app);
                         _status.Text = $"Checking leftovers for {app.Name}…";
                         var detected = await Task.Run(() => AppCleanup.Find(app, deep));
                         foreach (var item in detected)
@@ -412,8 +422,8 @@ namespace DiskBubbles
                 SetWriting(false);
             }
 
-            await ScanAsync();
             if (_closed) return;
+            UpdateLeftoverButton();
             _status.Text = $"{removed:N0} removed" + (restart > 0 ? $" · {restart:N0} need a restart" : "") +
                 (issues.Count > 0 ? $" · {issues.Count:N0} need attention" : "") +
                 (unavailable > 0 ? $" · {unavailable:N0} unavailable" : "") +
@@ -499,7 +509,8 @@ namespace DiskBubbles
                 _storageChanged();
                 _leftovers.RemoveAll(leftover => moved.Any(item => string.Equals(item.Path, leftover.Location, StringComparison.OrdinalIgnoreCase)));
                 pendingStatus = $"{moved.Count:N0} leftover folders moved to the Recycle Bin.";
-                UpdateList();
+                if (_showLeftovers) UpdateList();
+                else UpdateLeftoverButton();
             }
             catch (Exception error) when (AppInventory.IsRegistryError(error) || error is Win32Exception || error is ArgumentException)
             {

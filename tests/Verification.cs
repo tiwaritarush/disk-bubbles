@@ -630,7 +630,25 @@ internal static class Verification
         await CloseAppReview(window, uninstall, "Review uninstall", "Start uninstall");
         await CloseAppReview(window, deepUninstall, "Review deep uninstall", "Start deep uninstall");
         list.SelectedItem = archive;
-        await CloseAppReview(window, uninstall, "Uninstall unavailable", "Close");
+        bool darkWhileBusy = false;
+        await CloseAppReview(window, uninstall, "Uninstall unavailable", "Close", () =>
+        {
+            var bitmap = CaptureCurrent(window, Path.Combine(fixture, "../app-cleaner-uninstall-busy.png"));
+            var sample = list.TranslatePoint(new Point(list.ActualWidth / 2, list.ActualHeight - 12), (UIElement)window.Content);
+            var pixel = new byte[4];
+            bitmap.CopyPixels(new Int32Rect((int)sample.X, (int)sample.Y, 1, 1), pixel, 4, 0);
+            darkWhileBusy = !list.IsEnabled && Math.Max(pixel[0], Math.Max(pixel[1], pixel[2])) < 100;
+        });
+        Assert(darkWhileBusy, "The disabled app list switched away from its dark theme during uninstall.");
+
+        search.Text = "a";
+        list.SelectedItem = archive;
+        var visibleApps = list.ItemsSource;
+        page.GetType().GetMethod("RemoveInstalledApp", PrivateInstance).Invoke(page, new[] { studio });
+        Assert(!apps.Contains(studio) && !list.Items.Contains(studio) && list.Items.Contains(archive) &&
+            ReferenceEquals(list.SelectedItem, archive) && ReferenceEquals(list.ItemsSource, visibleApps) &&
+            search.Text == "a" && activeScan.GetValue(page) == null,
+            "A confirmed uninstall failed to update the current app list in place.");
         disk.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert(!page.IsVisible && ((FrameworkElement)WindowField(window, "_browser")).IsVisible &&
             ((TextBlock)WindowField(window, "_path")).Text == Path.Combine(fixture, "Empty"), "Switching modes discarded the disk scan.");
@@ -694,7 +712,7 @@ internal static class Verification
         }
     }
 
-    private static async Task CloseAppReview(Window window, Button action, string title, string expectedButton)
+    private static async Task CloseAppReview(Window window, Button action, string title, string expectedButton, Action inspect = null)
     {
         var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(25) };
@@ -710,6 +728,16 @@ internal static class Verification
                 return;
             }
             bool matched = modal.Title == title && FindVisual<Button>(modal, button => Equals(button.Content, expectedButton))?.IsEnabled == true;
+            if (matched && inspect != null)
+            {
+                try { inspect(); }
+                catch (Exception error)
+                {
+                    modal.Closed += (closed, args) => completion.SetException(error);
+                    modal.Close();
+                    return;
+                }
+            }
             modal.Closed += (closed, args) => completion.SetResult(matched);
             modal.Close();
         };
@@ -814,7 +842,7 @@ internal static class Verification
         CaptureCurrent(window, path, dpi);
     }
 
-    private static void CaptureCurrent(Window window, string path, double dpi = 96)
+    private static RenderTargetBitmap CaptureCurrent(Window window, string path, double dpi = 96)
     {
         var view = (FrameworkElement)window.Content;
         view.UpdateLayout();
@@ -826,6 +854,7 @@ internal static class Verification
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using (var file = File.Create(path))
             encoder.Save(file);
+        return bitmap;
     }
 
     private static void Assert(bool value, string message)

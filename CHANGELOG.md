@@ -1,5 +1,10 @@
 # Changelog
 
+## 10.4.1
+
+- Remove confirmed uninstalls from the current app list without a full scan.
+- Keep the app list themed while uninstall and cleanup actions are in progress.
+
 ## 10.4.0
 
 - Put Uninstall and Deep Uninstall in the App Cleaner details pane and extend both panes into the former footer.
