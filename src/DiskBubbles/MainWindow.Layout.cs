@@ -33,13 +33,10 @@ namespace DiskBubbles
 
             var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center };
-            var quiet = (Style)FindResource("QuietButton");
+            var toolbarAction = (Style)FindResource("ToolbarAction");
             foreach (var button in new[] { _folder, _drive, _recycleBin, _appearance })
             {
-                button.Style = quiet;
-                button.Width = 38;
-                button.Padding = new Thickness(7);
-                button.Margin = new Thickness(1, 0, 1, 0);
+                button.Style = toolbarAction;
                 actions.Children.Add(button);
             }
             SetToolbarIcon(_folder, UiVisuals.Folder, "Choose a folder to scan");
@@ -60,7 +57,7 @@ namespace DiskBubbles
 
         private static void SetToolbarIcon(Button button, string icon, string label)
         {
-            button.Content = UiVisuals.Icon(icon, "Muted", 17);
+            button.Content = UiVisuals.Icon(icon, "Muted", 19);
             button.ToolTip = label;
             AutomationProperties.SetName(button, label);
         }
@@ -80,7 +77,7 @@ namespace DiskBubbles
             var modes = new UniformGrid { Rows = 1, Columns = 2 };
             foreach (Button button in new[] { _diskMode, _appsMode })
             {
-                button.Style = (Style)FindResource("ModeSegment");
+                button.Style = (Style)FindResource("HeaderButton");
                 button.Width = 116;
                 button.MinHeight = 37;
                 button.Padding = new Thickness(10, 5, 10, 5);
@@ -111,9 +108,7 @@ namespace DiskBubbles
         private void UpdateAppearanceButton()
         {
             string action = Appearance.IsLight ? "Switch to dark mode" : "Switch to light mode";
-            _appearance.Content = UiVisuals.Icon(Appearance.IsLight ? UiVisuals.Moon : UiVisuals.Sun, "Muted", 17);
-            _appearance.ToolTip = action;
-            AutomationProperties.SetName(_appearance, action);
+            SetToolbarIcon(_appearance, Appearance.IsLight ? UiVisuals.Moon : UiVisuals.Sun, action);
         }
 
         private void BuildBrowser()

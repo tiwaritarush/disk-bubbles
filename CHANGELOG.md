@@ -1,5 +1,9 @@
 # Changelog
 
+## 10.3.8
+
+- Center the toolbar icons in equally sized buttons, with consistent spacing and inset keyboard focus.
+
 ## 10.3.7
 
 - Give the mode switch one shared outline, with a filled active tab and an inset keyboard focus indicator.

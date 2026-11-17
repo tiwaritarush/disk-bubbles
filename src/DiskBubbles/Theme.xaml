@@ -106,7 +106,7 @@
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
   </Style>
 
-  <Style x:Key="ModeSegment" TargetType="Button" BasedOn="{StaticResource QuietButton}">
+  <Style x:Key="HeaderButton" TargetType="Button" BasedOn="{StaticResource QuietButton}">
     <Setter Property="FocusVisualStyle">
       <Setter.Value>
         <Style TargetType="Control">
@@ -144,6 +144,13 @@
         </ControlTemplate>
       </Setter.Value>
     </Setter>
+  </Style>
+
+  <Style x:Key="ToolbarAction" TargetType="Button" BasedOn="{StaticResource HeaderButton}">
+    <Setter Property="Width" Value="40" />
+    <Setter Property="Height" Value="40" />
+    <Setter Property="Margin" Value="4,0" />
+    <Setter Property="Padding" Value="0" />
   </Style>
 
   <Style x:Key="Crumb" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
