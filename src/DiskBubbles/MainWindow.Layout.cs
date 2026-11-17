@@ -80,10 +80,11 @@ namespace DiskBubbles
             var modes = new UniformGrid { Rows = 1, Columns = 2 };
             foreach (Button button in new[] { _diskMode, _appsMode })
             {
-                button.Style = (Style)FindResource("QuietButton");
+                button.Style = (Style)FindResource("ModeSegment");
                 button.Width = 116;
                 button.MinHeight = 37;
                 button.Padding = new Thickness(10, 5, 10, 5);
+                button.Margin = new Thickness(1, 0, 1, 0);
                 modes.Children.Add(button);
             }
             _diskMode.Click += (sender, args) => ShowPage(_scan != null ? _scanning : _result == null ? _landing : _browser);
@@ -93,21 +94,16 @@ namespace DiskBubbles
                 await _appCleaner.OpenAsync();
             };
             return UiVisuals.Surface(new Border { Child = modes, Padding = new Thickness(3), CornerRadius = new CornerRadius(15),
-                BorderThickness = new Thickness(1), VerticalAlignment = VerticalAlignment.Center }, "GlassClear", "GlassEdge");
+                BorderThickness = new Thickness(1), VerticalAlignment = VerticalAlignment.Center }, "ModeTrack", "Line");
         }
 
         private static void SetActiveMode(Button button, bool selected)
         {
             if (selected)
-            {
-                button.SetResourceReference(Control.BackgroundProperty, "Raised");
-                button.SetResourceReference(Control.BorderBrushProperty, "Line");
-            }
+                button.SetResourceReference(Control.BackgroundProperty, "ModeSelection");
             else
-            {
                 button.ClearValue(Control.BackgroundProperty);
-                button.ClearValue(Control.BorderBrushProperty);
-            }
+            button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
             button.SetResourceReference(Control.ForegroundProperty, selected ? "Ink" : "Muted");
             AutomationProperties.SetItemStatus(button, selected ? "Current mode" : "");
         }

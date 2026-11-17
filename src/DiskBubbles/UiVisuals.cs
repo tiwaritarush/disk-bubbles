@@ -166,12 +166,12 @@ namespace DiskBubbles
             {
                 _shadow = Radial(center, 0.5, 0.5, (0, 0x96000209), (0.55, 0x62000209), (1, 0x00000209));
                 _body = Linear(new Point(0.15, 0), new Point(0.67, 1),
-                    (0, 0xCC4C5967), (0.37, 0xB635414E), (0.7, 0xA525323E), (1, 0xC43C4954));
+                    (0, 0xCC515353), (0.37, 0xB6383A3A), (0.7, 0xA5282A2A), (1, 0xC43D3F3F));
                 _frost = Radial(cloudySide, 0.68, 0.63,
-                    (0, 0x65E8EEF2), (0.43, 0x35E8EEF2), (0.77, 0x0CE8EEF2), (1, 0x00E8EEF2));
+                    (0, 0x54EEEEEE), (0.43, 0x2CEEEEEE), (0.77, 0x0AEEEEEE), (1, 0x00EEEEEE));
                 _bevel = Radial(new Point(0.51, 0.48), 0.50, 0.51,
-                    (0.71, 0x00E8EEF2), (0.85, 0x13E8EEF2), (0.95, 0x36E8EEF2), (1, 0x6AE8EEF2));
-                _edge = Edge((0, 0xCFE8EEF2), (0.40, 0x7BB8CAD4), (0.74, 0x35566777), (1, 0x868F9DA8));
+                    (0.71, 0x00EEEEEE), (0.85, 0x13EEEEEE), (0.95, 0x32EEEEEE), (1, 0x58EEEEEE));
+                _edge = Edge((0, 0xB7EEEEEE), (0.40, 0x71C1C3C3), (0.74, 0x356D7070), (1, 0x7A9B9E9E));
             }
         }
 

@@ -118,10 +118,10 @@ internal static class Verification
                 displayPath.Text = @"D:\Storage sample";
                 capacityLabel.Text = "320 GB used   ·   192 GB free";
                 capacityMeter.Value = 0.625;
-                Assert(((SolidColorBrush)window.Background).Color == Color.FromRgb(0, 4, 18) &&
-                    ((SolidColorBrush)window.Foreground).Color == Color.FromRgb(232, 238, 242) &&
+                Assert(((SolidColorBrush)window.Background).Color == Color.FromRgb(17, 17, 18) &&
+                    ((SolidColorBrush)window.Foreground).Color == Color.FromRgb(240, 240, 240) &&
                     ((SolidColorBrush)window.FindResource("BubbleTint")).Color == Color.FromRgb(43, 240, 138),
-                    "The dark appearance did not use midnight, ice and green glass.");
+                    "The dark appearance did not use charcoal, neutral text and green glass.");
                 await Capture(window, Path.Combine(fixture, "../preview.png"));
                 await Capture(window, Path.Combine(fixture, "../preview-2x.png"), 192);
                 setAppearance.Invoke(window, new object[] { true });

@@ -1,5 +1,10 @@
 # Changelog
 
+## 10.3.7
+
+- Give the mode switch one shared outline, with a filled active tab and an inset keyboard focus indicator.
+- Use neutral charcoal in dark mode and keep the green reflections inside the bubbles.
+
 ## 10.3.6
 
 - Give the top toolbar the same frosted glass as the results panes, and make file names, sizes, and breadcrumb labels easier to read.

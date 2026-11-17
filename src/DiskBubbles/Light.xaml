@@ -11,6 +11,8 @@
   <SolidColorBrush x:Key="AccentFill" Color="#050505" />
   <SolidColorBrush x:Key="Workspace" Color="#ECE6DC" />
   <SolidColorBrush x:Key="Chart" Color="#ECE6DC" />
+  <SolidColorBrush x:Key="ModeTrack" Color="#E7E1D8" />
+  <SolidColorBrush x:Key="ModeSelection" Color="#FAF7F2" />
   <SolidColorBrush x:Key="Attention" Color="#793D29" />
   <LinearGradientBrush x:Key="GlassEdge" StartPoint="0,0" EndPoint="0.8,1">
     <GradientStop Offset="0" Color="#FFFDF8" />

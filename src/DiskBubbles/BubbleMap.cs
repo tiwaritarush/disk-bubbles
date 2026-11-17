@@ -91,15 +91,15 @@ namespace DiskBubbles
         private static readonly Geometry FolderFront = Geometry.Parse("M 1,16 Q 1,13 4,13 L 28,13 Q 31,13 31,16 L 31,25 Q 31,28 28,28 L 4,28 Q 1,28 1,25 Z");
         private static readonly Geometry FileShape = Geometry.Parse("M 7,4 L 19,4 25,10 25,26 Q 25,28 23,28 L 9,28 Q 7,28 7,26 Z");
         private static readonly Geometry FileFold = Geometry.Parse("M 19,4 L 19,10 25,10 Z");
-        private static readonly Brush FolderFill = new LinearGradientBrush(Color.FromRgb(232, 238, 242), Color.FromRgb(157, 180, 196), 90);
-        private static readonly Brush FolderTab = new SolidColorBrush(Color.FromRgb(137, 159, 180));
-        private static readonly Brush FileFill = new LinearGradientBrush(Color.FromRgb(232, 238, 242), Color.FromRgb(160, 177, 190), 90);
-        private static readonly Brush FoldFill = new SolidColorBrush(Color.FromRgb(136, 158, 176));
+        private static readonly Brush FolderFill = new LinearGradientBrush(Color.FromRgb(236, 236, 236), Color.FromRgb(174, 177, 177), 90);
+        private static readonly Brush FolderTab = new SolidColorBrush(Color.FromRgb(148, 150, 150));
+        private static readonly Brush FileFill = new LinearGradientBrush(Color.FromRgb(236, 236, 236), Color.FromRgb(183, 185, 185), 90);
+        private static readonly Brush FoldFill = new SolidColorBrush(Color.FromRgb(151, 153, 153));
         private static readonly Brush LightFolderFill = new LinearGradientBrush(Color.FromRgb(49, 47, 46), Color.FromRgb(5, 5, 5), 90);
         private static readonly Brush LightFileFill = new LinearGradientBrush(Color.FromRgb(65, 62, 59), Color.FromRgb(22, 21, 20), 90);
         private static readonly Brush LightIconTab = new SolidColorBrush(Color.FromRgb(76, 72, 69));
-        private static readonly Brush PressShade = new SolidColorBrush(Color.FromArgb(58, 9, 10, 13));
-        private static readonly Brush DarkReflection = Glow(Color.FromArgb(44, 226, 238, 255), 0.5, 0.5);
+        private static readonly Brush PressShade = new SolidColorBrush(Color.FromArgb(58, 10, 10, 10));
+        private static readonly Brush DarkReflection = Glow(Color.FromArgb(38, 238, 238, 238), 0.5, 0.5);
         private static readonly Brush LightReflection = Glow(Color.FromArgb(74, 255, 255, 255), 0.5, 0.5);
 
         private readonly ConditionalWeakTable<DiskEntry, Layout> _cache = new ConditionalWeakTable<DiskEntry, Layout>();

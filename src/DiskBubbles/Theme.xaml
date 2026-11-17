@@ -106,6 +106,46 @@
     <Setter Property="Foreground" Value="{DynamicResource Muted}" />
   </Style>
 
+  <Style x:Key="ModeSegment" TargetType="Button" BasedOn="{StaticResource QuietButton}">
+    <Setter Property="FocusVisualStyle">
+      <Setter.Value>
+        <Style TargetType="Control">
+          <Setter Property="Template">
+            <Setter.Value>
+              <ControlTemplate TargetType="Control">
+                <Border Margin="3" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource Ink}" />
+              </ControlTemplate>
+            </Setter.Value>
+          </Setter>
+        </Style>
+      </Setter.Value>
+    </Setter>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid x:Name="Segment" Background="Transparent">
+            <Border Background="{TemplateBinding Background}" CornerRadius="10" />
+            <Border x:Name="Hover" Background="{DynamicResource Ink}" CornerRadius="10"
+                    Opacity="0" IsHitTestVisible="False" />
+            <ContentPresenter Margin="{TemplateBinding Padding}" VerticalAlignment="Center" HorizontalAlignment="Center"
+                              RecognizesAccessKey="True" />
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Hover" Property="Opacity" Value="0.06" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Hover" Property="Opacity" Value="0.12" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Segment" Property="Opacity" Value="0.48" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <Style x:Key="Crumb" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderBrush" Value="Transparent" />
