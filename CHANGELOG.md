@@ -1,5 +1,9 @@
 # Changelog
 
+## 10.1.2
+
+- Keep the first folder zoom playing when the map changes size as you leave the drive overview.
+
 ## 10.1.1
 
 - Folder zooms start after the file list lays out. The old and new maps move and fade together using cached artwork.

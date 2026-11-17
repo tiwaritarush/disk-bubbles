@@ -146,7 +146,7 @@ namespace DiskBubbles
             artwork.Children.Add(_highlight);
             effects.Show(artwork);
             Children.Add(effects);
-            SizeChanged += (sender, args) => Reflow(null, false);
+            SizeChanged += (sender, args) => ResizeArtwork();
             Unloaded += (sender, args) => Settle();
         }
 
@@ -223,12 +223,18 @@ namespace DiskBubbles
             Cursor = Cursors.Arrow;
         }
 
-        private void Reflow(DiskEntry origin, bool returning, bool animate = false, int pageDirection = 0)
+        private void ResizeArtwork()
         {
             if (_folder == null)
                 return;
 
-            List<Bubble> previous = _bubbles;
+            _front.Show(PrepareArtwork());
+            UpdateHighlight();
+            InvalidateVisual();
+        }
+
+        private DrawingGroup PrepareArtwork()
+        {
             double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
             if (!_cache.TryGetValue(_folder, out Layout layout) || layout.Viewport != RenderSize ||
                 layout.PixelsPerDip != pixelsPerDip || layout.Page != Page)
@@ -252,12 +258,22 @@ namespace DiskBubbles
             }
 
             _bubbles = layout.Bubbles;
+            return layout.Artwork;
+        }
+
+        private void Reflow(DiskEntry origin, bool returning, bool animate = false, int pageDirection = 0)
+        {
+            if (_folder == null)
+                return;
+
+            List<Bubble> previous = _bubbles;
+            DrawingGroup artwork = PrepareArtwork();
             Bubble anchor = (returning ? _bubbles : previous).Find(bubble => bubble.Entry == origin);
             if (animate && SystemParameters.ClientAreaAnimation && IsVisible && _front.Artwork != null)
-                Animate(layout.Artwork, anchor, returning, pageDirection);
+                Animate(artwork, anchor, returning, pageDirection);
             else
             {
-                _front.Show(layout.Artwork);
+                _front.Show(artwork);
                 Settle();
             }
 

@@ -289,7 +289,16 @@ internal static class Verification
                 Assert(path.Text == Path.Combine(fixture, "Projects"), "Bubble activation did not navigate.");
                 Assert(EntryName(entries.Items[0]) == "Design Sources", "Child entries did not populate.");
                 if (SystemParameters.ClientAreaAnimation)
+                {
+                    double originalHeight = map.ActualHeight;
+                    map.Height = originalHeight - 1;
+                    window.UpdateLayout();
+                    Assert(map.ActualHeight < originalHeight, "The first folder did not trigger the test layout change.");
+                    Assert((bool)transitioning.GetValue(map), "A layout change canceled the zoom from the first map.");
+                    map.ClearValue(FrameworkElement.HeightProperty);
+                    window.UpdateLayout();
                     Assert(((FrameworkElement)frontLayer.GetValue(map)).Opacity == 0, "The new map appeared before the zoom started.");
+                }
                 await Task.Delay(425);
                 Assert(!(bool)transitioning.GetValue(map), "Folder zoom did not settle.");
                 await Capture(window, Path.Combine(fixture, "../folder.png"));
