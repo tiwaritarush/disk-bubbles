@@ -1,5 +1,11 @@
 # Changelog
 
+## 10.3.2
+
+- Spread the pink and green blushes across the storage map and reflect them in the glass.
+- Show which part of the app scan is running and let you cancel from the progress screen.
+- Display registered Desktop and Store icons in App Cleaner when Windows makes them available.
+
 ## 10.3.1
 
 - Center the start and scan screens, bring both modes into one toolbar, and give App Cleaner one shared surface for the list and details.

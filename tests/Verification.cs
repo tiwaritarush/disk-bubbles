@@ -469,7 +469,7 @@ internal static class Verification
                 await Task.Delay(260);
                 await Capture(notice, Path.Combine(fixture, "../notice.png"));
                 notice.Close();
-                Console.WriteLine($"Verified {files.Count} files and {expected} bytes, map navigation, Recycle Bin safeguards, both themes, App Cleaner switching, app sizing, and uninstall review.");
+                Console.WriteLine($"Verified {files.Count} files and {expected} bytes, map navigation, Recycle Bin safeguards, both themes, App Cleaner progress and icons, app sizing, and uninstall review.");
                 application.Shutdown(0);
             }
             catch (Exception error)
@@ -498,8 +498,27 @@ internal static class Verification
             "A drive root or traversal path passed the app path boundary.");
 
         var page = (FrameworkElement)WindowField(window, "_appCleaner");
+        var disk = (Button)WindowField(window, "_diskMode");
+        var cleaner = (Button)WindowField(window, "_appsMode");
+        var list = (ListBox)page.GetType().GetField("_list", PrivateInstance).GetValue(page);
+        var scanAction = (Button)page.GetType().GetField("_scanAction", PrivateInstance).GetValue(page);
+        cleaner.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(!list.IsVisible && scanAction.IsVisible && (string)scanAction.Content == "Cancel scan",
+            "App Cleaner showed inactive results instead of the scan state.");
+        CaptureCurrent(window, Path.Combine(fixture, "../app-scan-light.png"));
+        if ((string)scanAction.Content == "Cancel scan")
+            scanAction.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var stop = DateTime.UtcNow.AddSeconds(5);
+        var activeScan = page.GetType().GetField("_scan", PrivateInstance);
+        while (activeScan.GetValue(page) != null && DateTime.UtcNow < stop)
+            await Task.Delay(20);
+        Assert(activeScan.GetValue(page) == null, "App Cleaner did not stop after canceling.");
         var entryType = assembly.GetType("DiskBubbles.InstalledApp");
+        var appIconProperty = entryType.GetProperty("Icon");
+        var iconReader = assembly.GetType("DiskBubbles.AppIcons").GetMethod("Load", BindingFlags.Static | BindingFlags.NonPublic);
+        var registeredIcon = entryType.GetField("DisplayIcon", PrivateInstance);
         var apps = (IList)page.GetType().GetField("_apps", PrivateInstance).GetValue(page);
+        apps.Clear();
         object Add(string name, string publisher, long? bytes, string kind = null)
         {
             var item = Activator.CreateInstance(entryType);
@@ -514,10 +533,45 @@ internal static class Verification
         }
 
         var studio = Add("Frame Studio", "Northlight Labs", 4880000000L);
-        Add("Station Audio", "Station", 1670000000L);
-        Add("Canvas Notes", null, 640000000L, "Example.Notes_4.2.1.0_x64__fixture");
-        Add("Archive Tool", "Archive Labs", 152000000L);
-        Add("Image Utility", "Field Tools", null);
+        var audio = Add("Station Audio", "Station", 1670000000L);
+        var notes = Add("Canvas Notes", null, 640000000L, "Example.Notes_4.2.1.0_x64__fixture");
+        var archive = Add("Archive Tool", "Archive Labs", 152000000L);
+        var noIcon = Add("Image Utility", "Field Tools", null);
+
+        string iconFolder = Directory.CreateDirectory(Path.Combine(fixture, "../Icon sample")).FullName;
+        string iconExecutable = Path.Combine(iconFolder, "Frame, Studio.exe");
+        File.Copy(assembly.Location, iconExecutable);
+        registeredIcon.SetValue(studio, "\"" + iconExecutable + "\",0");
+        var desktopIcon = await Task.Run(() => (ImageSource)iconReader.Invoke(null, new[] { studio }));
+        Assert(desktopIcon != null && desktopIcon.IsFrozen, "A quoted Desktop icon registration could not load on a scan worker.");
+        appIconProperty.SetValue(studio, desktopIcon);
+
+        var tile = new DrawingVisual();
+        using (var paint = tile.RenderOpen())
+        {
+            paint.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(238, 189, 102)), null, new Rect(1, 1, 46, 46), 10, 10);
+            for (int y = 16; y <= 32; y += 8)
+                paint.DrawRoundedRectangle(Brushes.SaddleBrown, null, new Rect(12, y, y == 32 ? 15 : 24, 2), 1, 1);
+        }
+        var logo = new RenderTargetBitmap(48, 48, 96, 96, PixelFormats.Pbgra32);
+        logo.Render(tile);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(logo));
+        using (var file = File.Create(Path.Combine(iconFolder, "Notes.targetsize-48_altform-unplated.png"))) encoder.Save(file);
+        var location = entryType.GetProperty("Location");
+        location.SetValue(notes, iconFolder);
+        string manifest = Path.Combine(iconFolder, "AppxManifest.xml");
+        File.WriteAllText(manifest, "<Package><VisualElements Square44x44Logo=\"Notes.png\" /></Package>");
+        var packageIcon = await Task.Run(() => (ImageSource)iconReader.Invoke(null, new[] { notes }));
+        Assert(packageIcon != null && packageIcon.IsFrozen, "A Store icon could not load from a qualified package asset.");
+        appIconProperty.SetValue(notes, packageIcon);
+        location.SetValue(notes, @"D:\Apps\Canvas Notes");
+        registeredIcon.SetValue(noIcon, @"\\remote.invalid\share\App.exe,0");
+        Assert(iconReader.Invoke(null, new[] { noIcon }) == null, "A remote icon path was accepted.");
+        appIconProperty.SetValue(audio, new DrawingImage(new GeometryDrawing(Brushes.MediumSlateBlue, null,
+            Geometry.Parse("M 1,7 A 6,6 0 1 0 13,7 A 6,6 0 1 0 1,7 M 4,7 L 6,7 7,4 8,10 9,7 10,7"))));
+        appIconProperty.SetValue(archive, new DrawingImage(new GeometryDrawing(Brushes.CadetBlue, null,
+            Geometry.Parse("M 1,3 H 13 V 5 H 1 Z M 2,6 H 12 V 12 H 2 Z M 5,7 H 9 V 8 H 5 Z"))));
         entryType.GetField("WindowsInstaller", PrivateInstance).SetValue(studio, true);
         entryType.GetField("Key", PrivateInstance).SetValue(studio, "{40F8C74A-E077-47BD-90AC-DC90F04304CD}");
         entryType.GetField("Command", PrivateInstance).SetValue(studio, "MsiExec.exe /I{40F8C74A-E077-47BD-90AC-DC90F04304CD}");
@@ -530,12 +584,10 @@ internal static class Verification
         entryType.GetField("Command", PrivateInstance).SetValue(studio, "MsiExec.exe /I{40F8C74A-E077-47BD-90AC-DC90F04304CD}");
         page.GetType().GetField("_loaded", PrivateInstance).SetValue(page, true);
         ((TextBlock)page.GetType().GetField("_status", PrivateInstance).GetValue(page)).Text = "5 installed apps · largest measured first";
+        page.GetType().GetMethod("UpdateScanView", PrivateInstance).Invoke(page, null);
         page.GetType().GetMethod("UpdateList", PrivateInstance).Invoke(page, null);
-        var disk = (Button)WindowField(window, "_diskMode");
-        var cleaner = (Button)WindowField(window, "_appsMode");
         cleaner.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert(page.IsVisible && !((FrameworkElement)WindowField(window, "_browser")).IsVisible, "App Cleaner did not open as a separate mode.");
-        var list = (ListBox)page.GetType().GetField("_list", PrivateInstance).GetValue(page);
         var search = (TextBox)page.GetType().GetField("_search", PrivateInstance).GetValue(page);
         search.Text = "Northlight";
         Assert(list.Items.Count == 1 && ReferenceEquals(list.Items[0], studio), "The app filter missed its publisher.");
@@ -545,6 +597,13 @@ internal static class Verification
         window.Height = Math.Max(window.MinHeight, Math.Min(870, SystemParameters.WorkArea.Height));
         var light = window.GetType().GetMethod("ChangeAppearance", PrivateInstance);
         await Capture(window, Path.Combine(fixture, "../app-cleaner-light.png"));
+        var studioRow = (ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(studio);
+        var studioImage = FindVisual<Image>(studioRow, image => image.Name == "RegisteredAppIcon");
+        Assert(studioImage != null && studioImage.IsVisible && ReferenceEquals(studioImage.Source, desktopIcon),
+            "The installed app's registered icon did not render in its row.");
+        var missingRow = (ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(noIcon);
+        Assert(FindVisual<Border>(missingRow, border => border.Name == "AppPlaceholder")?.IsVisible == true,
+            "An app without a registered icon did not show its fallback.");
         light.Invoke(window, new object[] { false });
         await Capture(window, Path.Combine(fixture, "../app-cleaner-dark.png"));
 
@@ -658,6 +717,11 @@ internal static class Verification
     private static async Task Capture(Window window, string path, double dpi = 96)
     {
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        CaptureCurrent(window, path, dpi);
+    }
+
+    private static void CaptureCurrent(Window window, string path, double dpi = 96)
+    {
         var view = (FrameworkElement)window.Content;
         view.UpdateLayout();
         double scale = dpi / 96;

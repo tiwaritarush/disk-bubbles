@@ -322,20 +322,41 @@
     </Setter>
   </Style>
 
+  <DataTemplate x:Key="AppGlyph">
+    <Grid IsHitTestVisible="False">
+      <Border x:Name="AppPlaceholder" Background="{DynamicResource Raised}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+              CornerRadius="8" Visibility="Collapsed">
+        <Path Data="M 3,3 H 10 V 10 H 3 Z M 14,3 H 21 V 10 H 14 Z M 3,14 H 10 V 21 H 3 Z M 14,14 H 21 V 21 H 14 Z"
+              Width="15" Height="15" HorizontalAlignment="Center" VerticalAlignment="Center"
+              Stroke="{DynamicResource Muted}" StrokeThickness="1.2" StrokeLineJoin="Round" Stretch="Uniform" />
+      </Border>
+      <Image x:Name="RegisteredAppIcon" Source="{Binding Icon}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+    </Grid>
+    <DataTemplate.Triggers>
+      <DataTrigger Binding="{Binding Icon}" Value="{x:Null}">
+        <Setter TargetName="AppPlaceholder" Property="Visibility" Value="Visible" />
+        <Setter TargetName="RegisteredAppIcon" Property="Visibility" Value="Collapsed" />
+      </DataTrigger>
+    </DataTemplate.Triggers>
+  </DataTemplate>
+
   <DataTemplate x:Key="AppRow">
     <Grid Margin="0,0,7,0" ToolTip="{Binding Location}">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="28" />
+        <ColumnDefinition Width="41" />
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="91" />
       </Grid.ColumnDefinitions>
       <CheckBox x:Name="MarkApp" Style="{StaticResource EntryMark}" IsChecked="{Binding Marked, Mode=TwoWay}"
                 IsEnabled="{Binding CanMark}" VerticalAlignment="Center" automation:AutomationProperties.Name="{Binding Name, StringFormat='Mark {0} for uninstall review'}" />
-      <StackPanel Grid.Column="1">
+      <ContentControl Grid.Column="1" Content="{Binding}" ContentTemplate="{StaticResource AppGlyph}" Width="30" Height="30"
+                      Focusable="False" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Center" />
+      <StackPanel Grid.Column="2">
         <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ink}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
         <TextBlock Text="{Binding Kind}" Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,2,0,0" />
       </StackPanel>
-      <TextBlock Grid.Column="2" Text="{Binding SizeLabel}" Foreground="{DynamicResource Muted}" FontSize="12"
+      <TextBlock Grid.Column="3" Text="{Binding SizeLabel}" Foreground="{DynamicResource Muted}" FontSize="12"
                  TextAlignment="Right" VerticalAlignment="Center" Margin="3,0,8,0" />
     </Grid>
   </DataTemplate>

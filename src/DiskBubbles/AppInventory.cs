@@ -8,6 +8,7 @@ using System.Security;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Media;
 using Microsoft.Win32;
 
 namespace DiskBubbles
@@ -19,6 +20,7 @@ namespace DiskBubbles
         public string Version { get; set; }
         public string Location { get; set; }
         public string Package { get; set; }
+        public ImageSource Icon { get; set; }
         public long? Bytes { get; set; }
         public bool PartialSize { get; set; }
         public bool Marked { get; set; }
@@ -30,6 +32,7 @@ namespace DiskBubbles
         internal RegistryView View;
         internal string Key;
         internal string Command;
+        internal string DisplayIcon;
         internal bool WindowsInstaller;
         internal bool Locked;
         internal string Id => Package ?? $"{Hive}:{View}:{Key}";
@@ -93,6 +96,7 @@ Get-AppxPackage -PackageTypeFilter Main,Bundle | Where-Object { " + StoreFilter 
                 Paths.Equals(app.Command, other.Command) && Paths.Equals(app.Location, other.Location)));
             try
             {
+                progress?.Report("Checking Microsoft Store apps…");
                 foreach (string row in RunPowerShell(ReadPackages, null, token).Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
                 {
                     string[] fields = row.Split('\t');
@@ -122,6 +126,9 @@ Get-AppxPackage -PackageTypeFilter Main,Bundle | Where-Object { " + StoreFilter 
                 if (done % 8 == 0)
                     progress?.Report($"Measured {done:N0} of {folders.Length:N0} folders…");
             });
+            progress?.Report("Loading app icons…");
+            Parallel.ForEach(inventory.Apps, new ParallelOptions { CancellationToken = token, MaxDegreeOfParallelism = 3 },
+                app => app.Icon = AppIcons.Load(app));
             return inventory;
         }
 
@@ -200,11 +207,12 @@ Get-AppxPackage -PackageTypeFilter Main,Bundle | Where-Object { " + StoreFilter 
                 name.StartsWith("Microsoft Windows Desktop Runtime", StringComparison.OrdinalIgnoreCase))
                 return null;
 
-            string location = Normalize(Read("InstallLocation")) ?? IconLocation(Read("DisplayIcon"));
+            string displayIcon = Read("DisplayIcon");
+            string location = Normalize(Read("InstallLocation")) ?? IconLocation(displayIcon);
             return new InstalledApp
             {
                 Name = name, Publisher = Read("Publisher"), Version = Read("DisplayVersion"), Location = location,
-                Hive = hive, View = view, Key = key, Command = Read("UninstallString"),
+                Hive = hive, View = view, Key = key, Command = Read("UninstallString"), DisplayIcon = displayIcon,
                 WindowsInstaller = Read("WindowsInstaller") == "1", Locked = Read("NoRemove") == "1",
             };
         }
@@ -223,7 +231,11 @@ Get-AppxPackage -PackageTypeFilter Main,Bundle | Where-Object { " + StoreFilter 
 
         internal static bool IsRegistryError(Exception error) => DiskScanner.IsFileSystemError(error) || error is SecurityException;
 
-        internal static string Normalize(string value)
+        internal static string Normalize(string value) => NormalizePath(value, false);
+
+        internal static string NormalizeIconFile(string value) => NormalizePath(value, true);
+
+        private static string NormalizePath(string value, bool icon)
         {
             if (string.IsNullOrWhiteSpace(value))
                 return null;
@@ -238,7 +250,7 @@ Get-AppxPackage -PackageTypeFilter Main,Bundle | Where-Object { " + StoreFilter 
                         return null;
                 path = Path.GetFullPath(path).TrimEnd('\\');
                 if (WideRoots.Any(root => !string.IsNullOrEmpty(root) && SystemProtection.IsInside(root, path)) ||
-                    (SystemProtection.ForPath(path) & EntryProtection.System) != 0 ||
+                    (!icon && (SystemProtection.ForPath(path) & EntryProtection.System) != 0) ||
                     new DriveInfo(Path.GetPathRoot(path)).DriveType != DriveType.Fixed)
                     return null;
                 return path;

@@ -13,7 +13,7 @@ Windows can tell you that a drive is nearly full. Figuring out which project, do
 - **Scan a drive or folder.** See progress as Windows enumerates the files. You can cancel a scan and return to your previous results.
 - **Explore by size.** Click a folder in the list or on the map to open it. Hover to see its size and share of the current folder. Use the map arrows to see smaller entries, including empty ones. Back and Forward remember your scroll position and map page.
 - **Mark items as you browse.** Check files or folders anywhere in the scan. Use the trash icon at the bottom right to review everything together. The app protects critical Windows locations and verifies file identities before asking Windows to move anything.
-- **Review installed apps.** Open App Cleaner to compare measured install folders and review desktop or Store uninstall actions. After a desktop uninstall, inspect any remaining install folder and review eligible folders for the Recycle Bin.
+- **Review installed apps.** App Cleaner shows scan progress, then lists desktop and Store apps with their registered icons and measured install sizes where available. Review uninstall actions or check for folders left after a desktop uninstall.
 - **Switch between light and dark.** The glass sits over a soft pink blush in the cream theme and green in the midnight theme. The app remembers your choice and follows the Windows animation setting.
 
 ![Disk Bubbles in the cream and ink theme with frosted glass bubbles.](docs/screenshots/light.png)

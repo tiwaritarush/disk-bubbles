@@ -20,6 +20,12 @@ namespace DiskBubbles
         private readonly Action<string> _openExplorer;
         private readonly Action _storageChanged;
         private readonly Action<bool> _writeStateChanged;
+        private readonly Grid _results = new Grid();
+        private readonly StackPanel _scanView = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 410 };
+        private readonly TextBlock _scanHeading = Label("", 32, "Ink", true);
+        private readonly TextBlock _scanDetail = Label("", 15, "Muted");
+        private readonly ProgressBar _scanMeter = new ProgressBar { Width = 280, Height = 5, Margin = new Thickness(0, 20, 0, 0) };
+        private readonly Button _scanAction = new Button { Margin = new Thickness(0, 22, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
         private readonly ListBox _list = new ListBox { BorderThickness = new Thickness(0), Background = Brushes.Transparent };
         private readonly TextBox _search = new TextBox { Width = 280, HorizontalAlignment = HorizontalAlignment.Left, VerticalContentAlignment = VerticalAlignment.Center };
         private readonly Button _refresh = new Button { Content = "Scan apps" };
@@ -28,6 +34,8 @@ namespace DiskBubbles
         private readonly Button _openFolder = new Button { Content = "Open folder…" };
         private readonly TextBlock _status = Label("", 13, "Muted");
         private readonly TextBlock _summary = Label("", 13, "Ink", true);
+        private readonly ContentControl _itemIcon = new ContentControl { Width = 52, Height = 52, HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 0, 0, 12), Focusable = false, IsHitTestVisible = false };
         private readonly TextBlock _itemName = Label("", 23, "Ink", true);
         private readonly TextBlock _itemInfo = Label("", 14, "Muted");
         private readonly TextBlock _itemSize = Label("", 25, "Ink", true);
@@ -50,10 +58,16 @@ namespace DiskBubbles
             _writeStateChanged = writeStateChanged;
             _owner.Closed += (sender, args) => { _closed = true; _scan?.Cancel(); };
             Build();
-            _refresh.Click += async (sender, args) =>
+            _refresh.Click += async (sender, args) => await ScanAsync();
+            _scanAction.Click += async (sender, args) =>
             {
-                if (_scan != null) _scan.Cancel();
-                else await ScanAsync();
+                if (_scan == null) await ScanAsync();
+                else
+                {
+                    _scanAction.IsEnabled = false;
+                    _scanDetail.Text = "Canceling scan…";
+                    _scan.Cancel();
+                }
             };
             _leftoverMode.Click += (sender, args) => { _showLeftovers = !_showLeftovers; _search.Clear(); UpdateList(); };
             _search.TextChanged += (sender, args) => UpdateList();
@@ -83,9 +97,10 @@ namespace DiskBubbles
 
         private void Build()
         {
-            RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            RowDefinitions.Add(new RowDefinition());
-            RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Children.Add(_results);
+            _results.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            _results.RowDefinitions.Add(new RowDefinition());
+            _results.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             var top = new DockPanel { Margin = new Thickness(3, 0, 3, 15) };
             var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -97,7 +112,7 @@ namespace DiskBubbles
             _status.VerticalAlignment = VerticalAlignment.Center;
             _status.Margin = new Thickness(0, 0, 12, 0);
             top.Children.Add(_status);
-            Children.Add(top);
+            _results.Children.Add(top);
 
             var columns = new Grid();
             columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -129,6 +144,8 @@ namespace DiskBubbles
             columns.Children.Add(table);
 
             var details = new StackPanel { Margin = new Thickness(17, 19, 16, 16) };
+            _itemIcon.ContentTemplate = (DataTemplate)FindResource("AppGlyph");
+            details.Children.Add(_itemIcon);
             details.Children.Add(_itemName);
             _itemName.TextWrapping = TextWrapping.Wrap;
             _itemInfo.TextWrapping = TextWrapping.Wrap;
@@ -152,7 +169,7 @@ namespace DiskBubbles
             columns.Children.Add(side);
             var card = UiVisuals.Surface(new Border { Child = columns, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(15) }, "Panel", "GlassEdge");
             SetRow(card, 1);
-            Children.Add(card);
+            _results.Children.Add(card);
 
             var footer = new DockPanel { Margin = new Thickness(3, 12, 3, 0) };
             UiVisuals.Emphasize(_review);
@@ -161,7 +178,41 @@ namespace DiskBubbles
             _summary.VerticalAlignment = VerticalAlignment.Center;
             footer.Children.Add(_summary);
             SetRow(footer, 2);
-            Children.Add(footer);
+            _results.Children.Add(footer);
+
+            var icon = UiVisuals.Icon(UiVisuals.Apps, "Muted", 34);
+            icon.HorizontalAlignment = HorizontalAlignment.Center;
+            _scanView.Children.Add(UiVisuals.Surface(new Border { Child = icon, Width = 68, Height = 68,
+                CornerRadius = new CornerRadius(19), BorderThickness = new Thickness(1),
+                Margin = new Thickness(0, 0, 0, 16), HorizontalAlignment = HorizontalAlignment.Center }, "Raised", "GlassEdge"));
+            _scanHeading.TextAlignment = TextAlignment.Center;
+            _scanDetail.TextAlignment = TextAlignment.Center;
+            _scanDetail.TextWrapping = TextWrapping.Wrap;
+            _scanDetail.Margin = new Thickness(0, 9, 0, 0);
+            _scanView.Children.Add(_scanHeading);
+            _scanView.Children.Add(_scanDetail);
+            _scanMeter.Template = (ControlTemplate)FindResource("ScanMeter");
+            _scanMeter.SetResourceReference(Control.ForegroundProperty, "Accent");
+            _scanMeter.SetResourceReference(Control.BackgroundProperty, "Line");
+            AutomationProperties.SetName(_scanMeter, "App scan in progress");
+            _scanView.Children.Add(_scanMeter);
+            _scanView.Children.Add(_scanAction);
+            Children.Add(_scanView);
+            UpdateScanView();
+        }
+
+        private void UpdateScanView()
+        {
+            bool scanning = _scan != null;
+            bool showResults = _loaded && !scanning;
+            _results.Visibility = showResults ? Visibility.Visible : Visibility.Collapsed;
+            _scanView.Visibility = showResults ? Visibility.Collapsed : Visibility.Visible;
+            _scanHeading.Text = scanning ? "Scanning installed apps…" : "Scan installed apps";
+            _scanDetail.Text = scanning ? "Reading the Windows app list…" : _status.Text.Length == 0 ? "Find apps and see how much space they use." : _status.Text;
+            _scanMeter.Visibility = scanning ? Visibility.Visible : Visibility.Collapsed;
+            _scanMeter.IsIndeterminate = scanning && SystemParameters.ClientAreaAnimation;
+            _scanAction.Content = scanning ? "Cancel scan" : "Scan apps";
+            _scanAction.IsEnabled = true;
         }
 
         private async Task ScanAsync()
@@ -170,12 +221,13 @@ namespace DiskBubbles
                 return;
             using var cancellation = new CancellationTokenSource();
             _scan = cancellation;
-            _status.Text = "Reading Windows’ installed app list…";
-            _refresh.Content = "Cancel scan";
-            UpdateActions();
+            bool moveFocus = IsKeyboardFocusWithin;
+            UpdateScanView();
+            if (moveFocus) _scanAction.Focus();
             var progress = new Progress<string>(text =>
             {
-                if (ReferenceEquals(_scan, cancellation) && !_closed) _status.Text = text;
+                if (ReferenceEquals(_scan, cancellation) && !cancellation.IsCancellationRequested && !_closed)
+                    _scanDetail.Text = text;
             });
             try
             {
@@ -202,8 +254,10 @@ namespace DiskBubbles
                 _scan = null;
                 if (!_closed)
                 {
-                    _refresh.Content = "Scan apps";
+                    bool returnFocus = IsKeyboardFocusWithin;
+                    UpdateScanView();
                     UpdateActions();
+                    if (returnFocus && _loaded) _refresh.Focus();
                 }
             }
         }
@@ -264,6 +318,8 @@ namespace DiskBubbles
         private void UpdateActions()
         {
             bool ready = _scan == null && !_writing;
+            _itemIcon.Content = _list.SelectedItem as InstalledApp;
+            _itemIcon.Visibility = _itemIcon.Content == null ? Visibility.Collapsed : Visibility.Visible;
             _review.Content = _showLeftovers ? "Review Recycle Bin move" : "Review uninstall";
             _search.IsEnabled = _list.IsEnabled = ready;
             _refresh.IsEnabled = !_writing;
