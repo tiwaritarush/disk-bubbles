@@ -94,11 +94,9 @@ namespace DiskBubbles
             actions.Children.Add(_refresh);
             DockPanel.SetDock(actions, Dock.Right);
             top.Children.Add(actions);
-            var heading = new StackPanel();
-            heading.Children.Add(Label("App Cleaner", 25, "Ink", true));
-            _status.Margin = new Thickness(0, 3, 0, 0);
-            heading.Children.Add(_status);
-            top.Children.Add(heading);
+            _status.VerticalAlignment = VerticalAlignment.Center;
+            _status.Margin = new Thickness(0, 0, 12, 0);
+            top.Children.Add(_status);
             Children.Add(top);
 
             var columns = new Grid();
@@ -144,11 +142,12 @@ namespace DiskBubbles
             _openFolder.Margin = new Thickness(0, 14, 0, 0);
             _openFolder.HorizontalAlignment = HorizontalAlignment.Left;
             details.Children.Add(_openFolder);
-            var side = UiVisuals.Surface(new Border
+            var side = new Border
             {
-                BorderThickness = new Thickness(1, 0, 0, 0), CornerRadius = new CornerRadius(0, 15, 15, 0),
+                BorderThickness = new Thickness(1, 0, 0, 0),
                 Child = new ScrollViewer { Content = details, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled },
-            }, "Chart", "Line");
+            };
+            side.SetResourceReference(Border.BorderBrushProperty, "Line");
             SetColumn(side, 1);
             columns.Children.Add(side);
             var card = UiVisuals.Surface(new Border { Child = columns, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(15) }, "Panel", "GlassEdge");

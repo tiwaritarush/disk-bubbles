@@ -30,14 +30,14 @@ namespace DiskBubbles
                 return;
 
             Brush blush = Appearance.IsLight ? (_lightBlush ??= BlushBrush(38)) : (_darkBlush ??= BlushBrush(49));
-            drawing.DrawEllipse(blush, null, new Point(bounds.X + bounds.Width * 0.54, bounds.Y + bounds.Height * 0.53),
+            drawing.DrawEllipse(blush, null, new Point(bounds.X + bounds.Width * 0.5, bounds.Y + bounds.Height * 0.5),
                 bounds.Width * 0.46, bounds.Height * 0.47);
         }
 
         private static Brush BlushBrush(byte strength)
         {
             Color tint = ((SolidColorBrush)Application.Current.FindResource("Atmosphere")).Color;
-            var brush = new RadialGradientBrush { RadiusX = 0.5, RadiusY = 0.5, GradientOrigin = new Point(0.60, 0.51) };
+            var brush = new RadialGradientBrush { RadiusX = 0.5, RadiusY = 0.5 };
             brush.GradientStops.Add(new GradientStop(Color.FromArgb(strength, tint.R, tint.G, tint.B), 0));
             brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(strength / 2), tint.R, tint.G, tint.B), 0.46));
             brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, tint.R, tint.G, tint.B), 1));
@@ -319,25 +319,26 @@ namespace DiskBubbles
 
         protected override void OnRender(DrawingContext drawing)
         {
-            double scale = Math.Min(ActualWidth / 440, ActualHeight / 376);
+            const double width = 280;
+            const double height = 174;
+            var center = new Point(width / 2, height / 2);
+            double scale = Math.Min(ActualWidth / width, ActualHeight / height);
             if (scale <= 0)
                 return;
 
-            drawing.PushTransform(new TranslateTransform((ActualWidth - 440 * scale) / 2, (ActualHeight - 376 * scale) / 2));
+            drawing.PushTransform(new TranslateTransform((ActualWidth - width * scale) / 2, (ActualHeight - height * scale) / 2));
             drawing.PushTransform(new ScaleTransform(scale, scale));
 
-            UiVisuals.DrawBlush(drawing, new Rect(6, 9, 426, 354));
+            UiVisuals.DrawBlush(drawing, new Rect(0, 0, width, height));
             Color lens = Appearance.IsLight ? Color.FromRgb(189, 174, 174) : Color.FromRgb(159, 186, 201);
             Color smallLens = Appearance.IsLight ? Color.FromRgb(184, 176, 165) : Color.FromRgb(162, 175, 191);
-            GlassOrb.Draw(drawing, new Point(221, 189), 91, lens);
-            GlassOrb.Draw(drawing, new Point(104, 111), 42, smallLens);
-            GlassOrb.Draw(drawing, new Point(349, 148), 36, lens);
-            GlassOrb.Draw(drawing, new Point(316, 284), 34, smallLens);
-            GlassOrb.Draw(drawing, new Point(113, 260), 31, lens);
-            GlassOrb.Draw(drawing, new Point(205, 79), 16, smallLens);
-            GlassOrb.Draw(drawing, new Point(219, 307), 18, smallLens);
-            drawing.PushTransform(new TranslateTransform(194, 162));
-            drawing.PushTransform(new ScaleTransform(2.25, 2.25));
+            GlassOrb.Draw(drawing, center, 52, lens);
+            GlassOrb.Draw(drawing, center + new Vector(-73, -23), 19, smallLens);
+            GlassOrb.Draw(drawing, center + new Vector(73, -23), 19, smallLens);
+            GlassOrb.Draw(drawing, center + new Vector(-67, 26), 14, smallLens);
+            GlassOrb.Draw(drawing, center + new Vector(67, 26), 14, smallLens);
+            drawing.PushTransform(new TranslateTransform(center.X - 20, center.Y - 19.2));
+            drawing.PushTransform(new ScaleTransform(1.6, 1.6));
             var ink = (Brush)FindResource("Ink");
             drawing.DrawGeometry(null, new Pen(ink, 0.75) { LineJoin = PenLineJoin.Round }, FolderGlyph);
             drawing.Pop();

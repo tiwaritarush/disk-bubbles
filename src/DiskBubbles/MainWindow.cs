@@ -107,9 +107,6 @@ namespace DiskBubbles
             var header = BuildHeader();
             DockPanel.SetDock(header, Dock.Top);
             shell.Children.Add(header);
-            var modes = BuildModeBar();
-            DockPanel.SetDock(modes, Dock.Top);
-            shell.Children.Add(modes);
             _surface.Margin = new Thickness(24, 20, 24, 15);
             shell.Children.Add(_surface);
             var viewport = new Grid();

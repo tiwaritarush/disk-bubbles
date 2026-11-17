@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -13,44 +14,57 @@ namespace DiskBubbles
     {
         private Border BuildHeader()
         {
-            var header = new DockPanel { LastChildFill = true };
-            var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            _recycleBin.Style = (Style)FindResource("QuietButton");
-            _recycleBin.Content = UiVisuals.WithIcon("Recycle Bin", UiVisuals.Bin, "Muted");
-            AutomationProperties.SetName(_recycleBin, "Open Recycle Bin");
-            _recycleBin.Margin = new Thickness(0, 0, 8, 0);
-            actions.Children.Add(_recycleBin);
-            _folder.Content = UiVisuals.WithIcon("Open folder…", UiVisuals.Folder, "Muted");
-            AutomationProperties.SetName(_folder, "Open folder to scan");
-            _folder.Margin = new Thickness(0, 0, 8, 0);
-            _drive.Content = UiVisuals.WithIcon("Scan drive  ▾", UiVisuals.Drive, "Muted");
-            AutomationProperties.SetName(_drive, "Choose a drive to scan");
-            actions.Children.Add(_folder);
-            actions.Children.Add(_drive);
-            _appearance.Margin = new Thickness(8, 0, 0, 0);
-            _appearance.Style = (Style)FindResource("QuietButton");
+            var header = new Grid();
+            header.ColumnDefinitions.Add(new ColumnDefinition());
+            header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            header.ColumnDefinitions.Add(new ColumnDefinition());
+
+            var brand = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            brand.Children.Add(Mark(29));
+            var title = Label("Disk Bubbles", 18, "Ink", FontWeights.SemiBold);
+            title.Margin = new Thickness(9, 0, 0, 0);
+            title.VerticalAlignment = VerticalAlignment.Center;
+            brand.Children.Add(title);
+            header.Children.Add(brand);
+
+            var modes = BuildModeControl();
+            Grid.SetColumn(modes, 1);
+            header.Children.Add(modes);
+
+            var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center };
+            var quiet = (Style)FindResource("QuietButton");
+            foreach (var button in new[] { _folder, _drive, _recycleBin, _appearance })
+            {
+                button.Style = quiet;
+                button.Width = 36;
+                button.Padding = new Thickness(7);
+                button.Margin = new Thickness(1, 0, 1, 0);
+                actions.Children.Add(button);
+            }
+            SetToolbarIcon(_folder, UiVisuals.Folder, "Choose a folder to scan");
+            SetToolbarIcon(_drive, UiVisuals.Drive, "Choose a drive to scan");
+            SetToolbarIcon(_recycleBin, UiVisuals.Bin, "Open Recycle Bin");
             UpdateAppearanceButton();
             _appearance.Click += (sender, args) =>
             {
                 ChangeAppearance(!Appearance.IsLight);
                 Appearance.SavePreference();
             };
-            actions.Children.Add(_appearance);
-            DockPanel.SetDock(actions, Dock.Right);
+            Grid.SetColumn(actions, 2);
             header.Children.Add(actions);
-
-            var brand = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            brand.Children.Add(Mark(33));
-            var title = Label("Disk Bubbles", 20, "Ink", FontWeights.SemiBold);
-            title.Margin = new Thickness(12, 0, 0, 0);
-            title.VerticalAlignment = VerticalAlignment.Center;
-            brand.Children.Add(title);
-            header.Children.Add(brand);
             return UiVisuals.Surface(new Border
             {
                 BorderThickness = new Thickness(0, 0, 0, 1),
-                Padding = new Thickness(24, 12, 24, 12), Child = header,
-            }, "Header", "GlassEdge");
+                Padding = new Thickness(24, 10, 24, 10), Child = header,
+            }, "Header", "Line");
+        }
+
+        private static void SetToolbarIcon(Button button, string icon, string label)
+        {
+            button.Content = UiVisuals.Icon(icon, "Muted", 17);
+            button.ToolTip = label;
+            AutomationProperties.SetName(button, label);
         }
 
         private void ChangeAppearance(bool light)
@@ -63,14 +77,15 @@ namespace DiskBubbles
                 illustration.InvalidateVisual();
         }
 
-        private Border BuildModeBar()
+        private Border BuildModeControl()
         {
-            var modes = new StackPanel { Orientation = Orientation.Horizontal };
+            var modes = new UniformGrid { Rows = 1, Columns = 2 };
             foreach (Button button in new[] { _diskMode, _appsMode })
             {
                 button.Style = (Style)FindResource("QuietButton");
-                button.MinWidth = 106;
-                button.Margin = new Thickness(0, 0, 6, 0);
+                button.Width = 108;
+                button.MinHeight = 34;
+                button.Padding = new Thickness(10, 5, 10, 5);
                 modes.Children.Add(button);
             }
             _diskMode.Click += (sender, args) => ShowPage(_scan != null ? _scanning : _result == null ? _landing : _browser);
@@ -79,14 +94,22 @@ namespace DiskBubbles
                 ShowPage(_appCleaner);
                 await _appCleaner.OpenAsync();
             };
-            return UiVisuals.Surface(new Border { Child = modes, Padding = new Thickness(24, 8, 24, 8),
-                BorderThickness = new Thickness(0, 0, 0, 1) }, "Workspace", "Line");
+            return UiVisuals.Surface(new Border { Child = modes, Padding = new Thickness(3), CornerRadius = new CornerRadius(15),
+                BorderThickness = new Thickness(1), VerticalAlignment = VerticalAlignment.Center }, "Panel", "Line");
         }
 
         private static void SetActiveMode(Button button, bool selected)
         {
-            button.SetResourceReference(Control.BackgroundProperty, selected ? "Raised" : "Workspace");
-            button.SetResourceReference(Control.BorderBrushProperty, selected ? "Accent" : "Workspace");
+            if (selected)
+            {
+                button.SetResourceReference(Control.BackgroundProperty, "Raised");
+                button.SetResourceReference(Control.BorderBrushProperty, "Line");
+            }
+            else
+            {
+                button.ClearValue(Control.BackgroundProperty);
+                button.ClearValue(Control.BorderBrushProperty);
+            }
             button.SetResourceReference(Control.ForegroundProperty, selected ? "Ink" : "Muted");
             AutomationProperties.SetItemStatus(button, selected ? "Current mode" : "");
         }
@@ -293,34 +316,24 @@ namespace DiskBubbles
         private void BuildLanding()
         {
             var body = new StackPanel();
-            var heading = Label("See where your\nspace went.", 47, "Ink", FontWeights.SemiBold);
-            heading.TextTrimming = TextTrimming.None;
-            heading.TextWrapping = TextWrapping.Wrap;
-            heading.LineHeight = 53;
-            heading.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
-            SizeChanged += (sender, args) =>
-            {
-                bool compact = ActualWidth < 900;
-                heading.FontSize = compact ? 36 : 47;
-                heading.LineHeight = compact ? 43 : 53;
-            };
+            var heading = Label("See where your space went.", 38, "Ink", FontWeights.SemiBold);
+            heading.TextAlignment = TextAlignment.Center;
             body.Children.Add(heading);
-            var hint = Label("Scan a drive or folder. Open the largest items directly from the map.", 16, "Muted");
-            hint.Margin = new Thickness(0, 20, 0, 0);
+            var hint = Label("Scan a drive or folder to see what’s taking up space.", 15, "Muted");
+            hint.Margin = new Thickness(0, 9, 0, 0);
             hint.TextWrapping = TextWrapping.Wrap;
-            hint.TextTrimming = TextTrimming.None;
-            hint.MaxWidth = 322;
-            hint.HorizontalAlignment = HorizontalAlignment.Left;
+            hint.TextAlignment = TextAlignment.Center;
             body.Children.Add(hint);
             string systemDrive = IOPath.GetPathRoot(Environment.SystemDirectory);
             var start = new Button { Content = UiVisuals.WithIcon("Scan " + systemDrive.TrimEnd('\\'), UiVisuals.Drive, "AccentInk"),
-                MinHeight = 44, Margin = new Thickness(0, 0, 8, 0) };
+                MinHeight = 42, Margin = new Thickness(0, 0, 4, 0) };
             AutomationProperties.SetName(start, "Scan " + systemDrive.TrimEnd('\\'));
             UiVisuals.Emphasize(start);
             start.Click += async (sender, args) => await ScanAsync(systemDrive);
-            var choose = new Button { Content = "Choose folder…", MinHeight = 44 };
+            var choose = new Button { Content = "Choose folder…", MinHeight = 42, Margin = new Thickness(4, 0, 0, 0) };
             choose.Click += async (sender, args) => await ChooseFolderAsync();
-            var actions = new WrapPanel { Margin = new Thickness(0, 26, 0, 0) };
+            var actions = new UniformGrid { Rows = 1, Columns = 2, Width = 296,
+                HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 22, 0, 0) };
             actions.Children.Add(start);
             actions.Children.Add(choose);
             body.Children.Add(actions);
@@ -330,22 +343,25 @@ namespace DiskBubbles
         private void BuildScanning()
         {
             var body = new StackPanel();
-            var heading = Label("Scanning storage", 37, "Ink", FontWeights.SemiBold);
+            var heading = Label("Scanning storage", 34, "Ink", FontWeights.SemiBold);
+            heading.TextAlignment = TextAlignment.Center;
             body.Children.Add(heading);
             FormatLabel(_scanCounts, 13, "Muted");
+            _scanCounts.TextAlignment = TextAlignment.Center;
             _scanCounts.Margin = new Thickness(0, 10, 0, 10);
             FormatLabel(_scanPath, 13, "Muted");
+            _scanPath.TextAlignment = TextAlignment.Center;
             _scanPath.Margin = new Thickness(0, 0, 0, 18);
             _scanPath.SetBinding(ToolTipProperty, new Binding("Text") { Source = _scanPath });
             body.Children.Add(_scanCounts);
             body.Children.Add(_scanPath);
             _spinner.SetResourceReference(Control.ForegroundProperty, "Accent");
             _spinner.SetResourceReference(Control.BackgroundProperty, "Line");
-            _spinner.HorizontalAlignment = HorizontalAlignment.Left;
+            _spinner.HorizontalAlignment = HorizontalAlignment.Center;
             _spinner.Template = (ControlTemplate)FindResource("ScanMeter");
             AutomationProperties.SetName(_spinner, "Scan in progress");
             body.Children.Add(_spinner);
-            _cancel.HorizontalAlignment = HorizontalAlignment.Left;
+            _cancel.HorizontalAlignment = HorizontalAlignment.Center;
             _cancel.Margin = new Thickness(0, 24, 0, 0);
             _cancel.Click += (sender, args) =>
             {
@@ -359,17 +375,14 @@ namespace DiskBubbles
 
         private void BuildIntro(Grid page, StackPanel body)
         {
-            var layout = new Grid { ClipToBounds = true };
-            layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 338 });
-            layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.12, GridUnitType.Star) });
-            body.VerticalAlignment = VerticalAlignment.Center;
-            body.Margin = new Thickness(42, 20, 12, 20);
-            layout.Children.Add(body);
-            var art = new StorageIllustration { IsHitTestVisible = false, Margin = new Thickness(2, 18, 23, 18) };
+            var intro = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+                MaxWidth = 560, Margin = new Thickness(16, 12, 16, 20) };
+            var art = new StorageIllustration { IsHitTestVisible = false, Width = 280, Height = 174,
+                HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 14) };
             _illustrations.Add(art);
-            Grid.SetColumn(art, 1);
-            layout.Children.Add(art);
-            page.Children.Add(Card(layout, "Hero"));
+            intro.Children.Add(art);
+            intro.Children.Add(body);
+            page.Children.Add(intro);
         }
 
         private TextBlock Label(string text, double size, string color, FontWeight? weight = null)

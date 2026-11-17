@@ -1,5 +1,9 @@
 # Changelog
 
+## 10.3.1
+
+- Center the start and scan screens, bring both modes into one toolbar, and give App Cleaner one shared surface for the list and details.
+
 ## 10.3.0
 
 - Open App Cleaner separately from Disk Scan. Compare measured install folders, filter apps, and review uninstall actions.

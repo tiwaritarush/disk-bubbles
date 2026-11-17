@@ -39,11 +39,6 @@
     <GradientStop Offset="0.57" Color="#040A18" />
     <GradientStop Offset="1" Color="#000412" />
   </RadialGradientBrush>
-  <RadialGradientBrush x:Key="Hero" Center="0.71,0.49" GradientOrigin="0.71,0.43" RadiusX="0.77" RadiusY="1.01">
-    <GradientStop Offset="0" Color="#142436" />
-    <GradientStop Offset="0.55" Color="#080F1E" />
-    <GradientStop Offset="1" Color="#000412" />
-  </RadialGradientBrush>
 
   <SolidColorBrush x:Key="TooltipFill" Color="#172231" />
   <SolidColorBrush x:Key="TooltipEdge" Color="#4A5C70" />
