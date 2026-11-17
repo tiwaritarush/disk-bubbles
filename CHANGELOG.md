@@ -1,5 +1,10 @@
 # Changelog
 
+## 10.1.1
+
+- Folder zooms start after the file list lays out. The old and new maps move and fade together using cached artwork.
+- Smaller bubbles fit into the gaps between larger ones, creating a tighter cluster across folders and map pages.
+
 ## 10.1.0
 
 - Open folders with one click in the list or on the map. The zoom follows the bubble, with shorter transitions and a reflection that follows the pointer.

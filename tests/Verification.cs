@@ -225,8 +225,9 @@ internal static class Verification
                 Assert((long)result.GetType().GetField("VolumeBytes").GetValue(result) > 0, "Volume capacity was unavailable.");
                 var packed = (IList)map.GetType().GetField("_bubbles", PrivateInstance).GetValue(map);
                 Assert(packed.Count == 12, "Map uses the wrong number of bubbles.");
-                var drawingField = map.GetType().GetField("_drawing", PrivateInstance);
-                var originalArtwork = ((DrawingGroup)drawingField.GetValue(map)).Children[0];
+                var frontLayer = map.GetType().GetField("_front", PrivateInstance);
+                var artwork = frontLayer.FieldType.GetProperty("Artwork");
+                var originalArtwork = artwork.GetValue(frontLayer.GetValue(map));
                 var circles = packed.Cast<object>().Select(circle => new
                 {
                     Center = (Point)circle.GetType().GetField("Center").GetValue(circle),
@@ -267,7 +268,10 @@ internal static class Verification
                     Assert(circle.Center.X >= circle.Radius && circle.Center.X + circle.Radius <= map.ActualWidth, "Bubble exceeds map width.");
                     Assert(circle.Center.Y >= circle.Radius && circle.Center.Y + circle.Radius <= map.ActualHeight, "Bubble exceeds map height.");
                     for (int j = 0; j < i; j++)
-                        Assert((circle.Center - circles[j].Center).Length >= circle.Radius + circles[j].Radius + 8, "Bubbles have insufficient separation.");
+                        Assert((circle.Center - circles[j].Center).Length >= circle.Radius + circles[j].Radius + 5, "Bubbles have insufficient separation.");
+                    double nearestGap = circles.Where((neighbor, index) => index != i)
+                        .Min(neighbor => (neighbor.Center - circle.Center).Length - neighbor.Radius - circle.Radius);
+                    Assert(nearestGap <= 14, "A bubble was left apart from the cluster.");
                 }
 
                 var press = map.GetType().GetMethod("Press", PrivateInstance);
@@ -284,7 +288,9 @@ internal static class Verification
                     Assert((bool)transitioning.GetValue(map), "Folder zoom did not start.");
                 Assert(path.Text == Path.Combine(fixture, "Projects"), "Bubble activation did not navigate.");
                 Assert(EntryName(entries.Items[0]) == "Design Sources", "Child entries did not populate.");
-                await Task.Delay(365);
+                if (SystemParameters.ClientAreaAnimation)
+                    Assert(((FrameworkElement)frontLayer.GetValue(map)).Opacity == 0, "The new map appeared before the zoom started.");
+                await Task.Delay(425);
                 Assert(!(bool)transitioning.GetValue(map), "Folder zoom did not settle.");
                 await Capture(window, Path.Combine(fixture, "../folder.png"));
 
@@ -296,7 +302,7 @@ internal static class Verification
                 Assert(path.Text == fixture, "Double-clicking the background did not go up one folder.");
                 Assert(EntryName(entries.Items[0]) == "Projects", "Root entries did not repopulate.");
                 Assert(ReferenceEquals(packed, map.GetType().GetField("_bubbles", PrivateInstance).GetValue(map)), "Returning did not reuse packed geometry.");
-                Assert(ReferenceEquals(originalArtwork, ((DrawingGroup)drawingField.GetValue(map)).Children[0]), "Returning rebuilt glass artwork.");
+                Assert(ReferenceEquals(originalArtwork, artwork.GetValue(frontLayer.GetValue(map))), "Returning rebuilt glass artwork.");
                 var back = (Button)WindowField(window, "_back");
                 var forward = (Button)WindowField(window, "_forward");
                 back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));

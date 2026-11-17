@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -17,13 +18,13 @@ namespace DiskBubbles
         public double Radius;
     }
 
-    internal sealed class BubbleMap : FrameworkElement
+    internal sealed class BubbleMap : Grid
     {
         public const int PageSize = 12;
-        private const double Gap = 15;
-        private static readonly Vector[] Directions = Enumerable.Range(0, 48).Select(step =>
+        private const double Gap = 8;
+        private static readonly Vector[] Directions = Enumerable.Range(0, 24).Select(step =>
         {
-            double angle = (step + 0.5) * Math.PI / 24;
+            double angle = step * Math.PI / 12;
             return new Vector(Math.Cos(angle), Math.Sin(angle));
         }).ToArray();
         private sealed class Layout
@@ -35,6 +36,52 @@ namespace DiskBubbles
             public bool Light;
             public int Page;
         }
+
+        private sealed class MapLayer : FrameworkElement
+        {
+            public DrawingGroup Artwork { get; private set; }
+
+            public void Show(DrawingGroup artwork)
+            {
+                if (Artwork == artwork)
+                    return;
+                Artwork = artwork;
+                InvalidateVisual();
+            }
+
+            public void Place(Matrix pose, double opacity)
+            {
+                BeginAnimation(OpacityProperty, null);
+                Opacity = opacity;
+                RenderTransform = new MatrixTransform(pose);
+            }
+
+            public void MoveTo(Matrix target, double opacity, int duration, EventHandler finished = null)
+            {
+                Matrix start = RenderTransform.Value;
+                var scale = new ScaleTransform(start.M11, start.M22);
+                var translation = new TranslateTransform(start.OffsetX, start.OffsetY);
+                var transform = new TransformGroup();
+                transform.Children.Add(scale);
+                transform.Children.Add(translation);
+                RenderTransform = transform;
+                scale.BeginAnimation(ScaleTransform.ScaleXProperty, UiMotion.MapTween(start.M11, target.M11, duration));
+                scale.BeginAnimation(ScaleTransform.ScaleYProperty, UiMotion.MapTween(start.M22, target.M22, duration));
+                translation.BeginAnimation(TranslateTransform.XProperty, UiMotion.MapTween(start.OffsetX, target.OffsetX, duration));
+                translation.BeginAnimation(TranslateTransform.YProperty, UiMotion.MapTween(start.OffsetY, target.OffsetY, duration));
+                var fade = UiMotion.MapTween(Opacity, opacity, duration);
+                if (finished != null)
+                    fade.Completed += finished;
+                BeginAnimation(OpacityProperty, fade);
+            }
+
+            protected override void OnRender(DrawingContext drawing)
+            {
+                if (Artwork != null)
+                    drawing.DrawDrawing(Artwork);
+            }
+        }
+
         private readonly Typeface _nameFont = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal,
             FontWeights.SemiBold, FontStretches.Normal);
         private readonly Typeface _sizeFont = new Typeface("Segoe UI");
@@ -76,17 +123,31 @@ namespace DiskBubbles
         private DiskEntry _pressed;
         private Point _pressedAt;
         private bool _backgroundDown;
-        private DrawingGroup _drawing = new DrawingGroup();
-        private DrawingGroup _outgoing;
+        private MapLayer _front = new MapLayer { IsHitTestVisible = false };
+        private MapLayer _rear = new MapLayer { IsHitTestVisible = false, Opacity = 0 };
         private readonly DrawingGroup _pointerLight = new DrawingGroup();
         private readonly DrawingGroup _highlight = new DrawingGroup();
         private readonly TranslateTransform _reflectionPosition = new TranslateTransform();
+        private EventHandler _startOnFrame;
+        private int _transitionId;
         private bool _transitioning;
 
         public BubbleMap()
         {
             ClipToBounds = true;
+            if ((RenderCapability.Tier >> 16) > 0)
+                _front.CacheMode = _rear.CacheMode = new BitmapCache(1.18);
+            Children.Add(_rear);
+            Children.Add(_front);
+            var effects = new MapLayer { IsHitTestVisible = false };
+            SetZIndex(effects, 2);
+            var artwork = new DrawingGroup();
+            artwork.Children.Add(_pointerLight);
+            artwork.Children.Add(_highlight);
+            effects.Show(artwork);
+            Children.Add(effects);
             SizeChanged += (sender, args) => Reflow(null, false);
+            Unloaded += (sender, args) => Settle();
         }
 
         public event Action<DiskEntry> Activated;
@@ -118,7 +179,7 @@ namespace DiskBubbles
                 return;
             var reveal = UiMotion.Ease(0.32, 1, UiMotion.RevealMs);
             reveal.FillBehavior = FillBehavior.Stop;
-            _drawing.BeginAnimation(DrawingGroup.OpacityProperty, reveal);
+            _front.BeginAnimation(OpacityProperty, reveal);
         }
 
         public DiskEntry RowHover
@@ -168,7 +229,6 @@ namespace DiskBubbles
                 return;
 
             List<Bubble> previous = _bubbles;
-            DrawingGroup previousDrawing = _drawing;
             double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
             if (!_cache.TryGetValue(_folder, out Layout layout) || layout.Viewport != RenderSize ||
                 layout.PixelsPerDip != pixelsPerDip || layout.Page != Page)
@@ -192,77 +252,93 @@ namespace DiskBubbles
             }
 
             _bubbles = layout.Bubbles;
-            _outgoing = null;
-            _transitioning = false;
-            _drawing = new DrawingGroup();
-            _drawing.Children.Add(layout.Artwork);
-
             Bubble anchor = (returning ? _bubbles : previous).Find(bubble => bubble.Entry == origin);
-            if (animate && SystemParameters.ClientAreaAnimation && ActualWidth > 0 && ActualHeight > 0)
-                Animate(previousDrawing, anchor, returning, pageDirection);
+            if (animate && SystemParameters.ClientAreaAnimation && IsVisible && _front.Artwork != null)
+                Animate(layout.Artwork, anchor, returning, pageDirection);
+            else
+            {
+                _front.Show(layout.Artwork);
+                Settle();
+            }
 
             UpdateHighlight();
             InvalidateVisual();
         }
 
-        private void Animate(DrawingGroup previous, Bubble anchor, bool returning, int pageDirection)
+        private void Animate(DrawingGroup artwork, Bubble anchor, bool returning, int pageDirection)
         {
-            var outgoing = new DrawingGroup();
-            outgoing.Children.Add((Drawing)previous.GetCurrentValueAsFrozen());
-            _outgoing = outgoing;
-            DrawingGroup incoming = _drawing;
+            CancelFrameStart();
+            int transitionId = ++_transitionId;
+            if (_rear.Opacity > _front.Opacity)
+                anchor = null;
+            else
+                (_front, _rear) = (_rear, _front);
+
+            MapLayer incoming = _front;
+            MapLayer outgoing = _rear;
+            SetZIndex(outgoing, 0);
+            SetZIndex(incoming, 1);
+            outgoing.Place(outgoing.RenderTransform.Value, outgoing.Opacity);
+            incoming.Show(artwork);
             _transitioning = true;
             var center = new Point(ActualWidth / 2, ActualHeight / 2);
-            Point pivot = anchor?.Center ?? center;
+            Point pivot = anchor == null ? center : returning ? anchor.Center : outgoing.RenderTransform.Value.Transform(anchor.Center);
             Vector offset = pivot - center;
+            Matrix incomingStart;
+            Matrix outgoingEnd;
             if (pageDirection != 0)
             {
-                var slide = new Vector(34 * pageDirection, 0);
-                AnimateScene(incoming, center, 1, 1, slide, new Vector(), UiMotion.ZoomMs);
-                AnimateScene(outgoing, center, 1, 1, new Vector(), -slide, UiMotion.ZoomFadeMs);
+                var slide = new Vector(30 * pageDirection, 0);
+                incomingStart = Pose(center, 1, slide);
+                outgoingEnd = Pose(center, 1, -slide);
             }
             else
             {
-                double entryScale = anchor == null ? 0.91 : Math.Max(0.54, Math.Min(0.79, anchor.Radius / center.Y + 0.25));
-                AnimateScene(incoming, center, returning ? 1.18 : entryScale, 1,
-                    offset * (returning ? -0.23 : 0.88), new Vector(), UiMotion.ZoomMs);
-                AnimateScene(outgoing, returning ? center : pivot, 1, returning ? 0.69 : 1.52,
-                    new Vector(), offset * (returning ? 0.63 : -0.56), UiMotion.ZoomFadeMs);
+                double entryScale = anchor == null ? 0.91 : Math.Max(0.60, Math.Min(0.83, anchor.Radius / center.Y + 0.31));
+                incomingStart = Pose(center, returning ? 1.14 : entryScale, offset * (returning ? -0.20 : 1));
+                outgoingEnd = Pose(returning ? center : pivot, returning ? 0.73 : 1.35,
+                    offset * (returning ? 0.86 : -0.64));
             }
 
-            outgoing.BeginAnimation(DrawingGroup.OpacityProperty, UiMotion.Ease(1, 0, UiMotion.ZoomFadeMs));
-            var fade = UiMotion.Ease(0.44, 1, UiMotion.ZoomMs);
-            fade.Completed += (sender, args) =>
+            incoming.Place(incomingStart, 0);
+            _startOnFrame = (sender, args) =>
             {
-                if (_drawing != incoming)
-                    return;
-
-                _outgoing = null;
-                _transitioning = false;
-                incoming.BeginAnimation(DrawingGroup.OpacityProperty, null);
-                incoming.Transform = Transform.Identity;
-                if (IsMouseOver)
-                    TrackPointer(Mouse.GetPosition(this));
-                UpdateHighlight();
-                InvalidateVisual();
+                CancelFrameStart();
+                int duration = pageDirection == 0 ? UiMotion.ZoomMs : UiMotion.PageSlideMs;
+                outgoing.MoveTo(outgoingEnd, 0, duration);
+                incoming.MoveTo(Matrix.Identity, 1, duration, (clock, completed) =>
+                {
+                    if (_transitionId != transitionId)
+                        return;
+                    Settle();
+                    if (IsMouseOver)
+                        TrackPointer(Mouse.GetPosition(this));
+                    UpdateHighlight();
+                });
             };
-            incoming.BeginAnimation(DrawingGroup.OpacityProperty, fade);
+            CompositionTarget.Rendering += _startOnFrame;
         }
 
-        private static void AnimateScene(DrawingGroup scene, Point pivot, double fromScale, double toScale,
-            Vector from, Vector to, int duration)
+        private void CancelFrameStart()
         {
-            var zoom = new ScaleTransform(1, 1, pivot.X, pivot.Y);
-            var position = new TranslateTransform();
-            var transform = new TransformGroup();
-            transform.Children.Add(zoom);
-            transform.Children.Add(position);
-            scene.Transform = transform;
-            zoom.BeginAnimation(ScaleTransform.ScaleXProperty, UiMotion.Ease(fromScale, toScale, duration));
-            zoom.BeginAnimation(ScaleTransform.ScaleYProperty, UiMotion.Ease(fromScale, toScale, duration));
-            position.BeginAnimation(TranslateTransform.XProperty, UiMotion.Ease(from.X, to.X, duration));
-            position.BeginAnimation(TranslateTransform.YProperty, UiMotion.Ease(from.Y, to.Y, duration));
+            if (_startOnFrame == null)
+                return;
+            CompositionTarget.Rendering -= _startOnFrame;
+            _startOnFrame = null;
         }
+
+        private void Settle()
+        {
+            CancelFrameStart();
+            _transitionId++;
+            _transitioning = false;
+            _front.Place(Matrix.Identity, 1);
+            _rear.Place(Matrix.Identity, 0);
+            _rear.Show(null);
+        }
+
+        private static Matrix Pose(Point pivot, double scale, Vector shift) =>
+            new Matrix(scale, 0, 0, scale, pivot.X * (1 - scale) + shift.X, pivot.Y * (1 - scale) + shift.Y);
 
         internal static List<Bubble> Pack(IReadOnlyList<DiskEntry> entries, double width, double height)
         {
@@ -271,35 +347,54 @@ namespace DiskBubbles
             if (entries.Count == 0 || width <= margin * 2 || height <= margin * 2)
                 return bubbles;
 
-            double aspect = Math.Max(0.58, Math.Min(1.95, (width - 2 * margin) / (height - 2 * margin)));
+            double aspect = Math.Max(0.68, Math.Min(1.28, (width - 2 * margin) / (height - 2 * margin)));
             double largest = Math.Max(1, entries[0].Bytes);
             Rect bounds = Rect.Empty;
 
             foreach (DiskEntry entry in entries)
             {
-                double radius = Math.Max(19, 100 * Math.Sqrt(entry.Bytes / largest));
+                double radius = entries[0].Bytes == 0 ? 40 : Math.Max(19, 100 * Math.Sqrt(entry.Bytes / largest));
                 Point position = bounds.IsEmpty ? new Point() : new Point(bounds.Right + Gap + radius, 0);
                 Rect bestBounds = Include(bounds, position, radius);
                 if (bubbles.Count > 0)
                 {
                     double bestScore = PlacementScore(bestBounds, position, aspect);
-                    foreach (Bubble anchor in bubbles)
+                    void Consider(Point point)
                     {
-                        double distance = anchor.Radius + radius + Gap;
-                        foreach (Vector direction in Directions)
+                        if (Overlaps(bubbles, point, radius))
+                            return;
+                        Rect candidate = Include(bounds, point, radius);
+                        double score = PlacementScore(candidate, point, aspect);
+                        if (score < bestScore)
                         {
-                            Point point = anchor.Center + direction * distance;
-                            if (Overlaps(bubbles, point, radius))
-                                continue;
+                            bestScore = score;
+                            position = point;
+                            bestBounds = candidate;
+                        }
+                    }
 
-                            Rect candidate = Include(bounds, point, radius);
-                            double score = PlacementScore(candidate, point, aspect);
-                            if (score < bestScore)
-                            {
-                                bestScore = score;
-                                position = point;
-                                bestBounds = candidate;
-                            }
+                    for (int i = 0; i < bubbles.Count; i++)
+                    {
+                        Bubble anchor = bubbles[i];
+                        double reach = anchor.Radius + radius + Gap;
+                        foreach (Vector direction in Directions)
+                            Consider(anchor.Center + direction * reach);
+
+                        for (int j = 0; j < i; j++)
+                        {
+                            Bubble neighbor = bubbles[j];
+                            Vector between = neighbor.Center - anchor.Center;
+                            double distance = between.Length;
+                            double neighborReach = neighbor.Radius + radius + Gap;
+                            double along = (reach * reach - neighborReach * neighborReach + distance * distance) / (2 * distance);
+                            double heightSquared = reach * reach - along * along;
+                            if (heightSquared <= 0)
+                                continue;
+                            Vector axis = between / distance;
+                            Point middle = anchor.Center + axis * along;
+                            Vector offset = new Vector(-axis.Y, axis.X) * Math.Sqrt(heightSquared);
+                            Consider(middle + offset);
+                            Consider(middle - offset);
                         }
                     }
                 }
@@ -327,7 +422,7 @@ namespace DiskBubbles
             double width = bounds.Width / aspect;
             double height = bounds.Height;
             var center = new Vector((bounds.Left + bounds.Right) / (2 * aspect), (bounds.Top + bounds.Bottom) / 2);
-            return Math.Max(width, height) + 0.12 * (width + height) + 0.38 * center.Length + 0.06 * ((Vector)added).Length;
+            return Math.Max(width, height) + 0.16 * (width + height) + 0.30 * center.Length + 0.24 * ((Vector)added).Length;
         }
 
         private static Rect Include(Rect bounds, Point point, double radius)
@@ -350,12 +445,6 @@ namespace DiskBubbles
         protected override void OnRender(DrawingContext drawing)
         {
             drawing.DrawRectangle(Appearance.IsLight ? LightWash : DarkWash, null, new Rect(RenderSize));
-
-            if (_outgoing != null)
-                drawing.DrawDrawing(_outgoing);
-            drawing.DrawDrawing(_drawing);
-            drawing.DrawDrawing(_pointerLight);
-            drawing.DrawDrawing(_highlight);
         }
 
         private static Brush Glow(Color color, double radiusX, double radiusY)
@@ -575,8 +664,14 @@ namespace DiskBubbles
 
         private DiskEntry Hit(Point position)
         {
-            if (_transitioning && _drawing.Transform.Inverse is GeneralTransform inverse)
+            if (_transitioning)
+            {
+                if (_front.Opacity < 0.12)
+                    return null;
+                Matrix inverse = _front.RenderTransform.Value;
+                inverse.Invert();
                 position = inverse.Transform(position);
+            }
             foreach (Bubble bubble in _bubbles)
                 if ((position - bubble.Center).LengthSquared <= bubble.Radius * bubble.Radius)
                     return bubble.Entry;

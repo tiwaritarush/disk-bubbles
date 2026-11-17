@@ -10,8 +10,8 @@ namespace DiskBubbles
     internal static class UiMotion
     {
         public const int HoverMs = 100;
-        public const int ZoomMs = 215;
-        public const int ZoomFadeMs = 155;
+        public const int ZoomMs = 285;
+        public const int PageSlideMs = 205;
         public const int RevealMs = 210;
         public const int DialogEnterMs = 225;
         public const int DialogExitMs = 170;
@@ -37,6 +37,15 @@ namespace DiskBubbles
                 EasingFunction = new SplineEase(leaving),
                 FillBehavior = FillBehavior.HoldEnd,
             };
+
+        public static DoubleAnimationUsingKeyFrames MapTween(double from, double to, int milliseconds)
+        {
+            var animation = new DoubleAnimationUsingKeyFrames();
+            animation.KeyFrames.Add(new LinearDoubleKeyFrame(from, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            animation.KeyFrames.Add(new SplineDoubleKeyFrame(to, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(milliseconds)),
+                new KeySpline(0.28, 0.08, 0.24, 1)));
+            return animation;
+        }
     }
 
     internal sealed class DialogMotion

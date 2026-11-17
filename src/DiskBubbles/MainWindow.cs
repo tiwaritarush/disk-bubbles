@@ -12,7 +12,6 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Threading;
 using Forms = System.Windows.Forms;
 using IOPath = System.IO.Path;
 
@@ -65,7 +64,6 @@ namespace DiskBubbles
         private readonly Stack<List<DiskEntry>> _backHistory = new Stack<List<DiskEntry>>();
         private readonly Stack<List<DiskEntry>> _forwardHistory = new Stack<List<DiskEntry>>();
         private readonly ConditionalWeakTable<DiskEntry, FolderView> _folderViews = new ConditionalWeakTable<DiskEntry, FolderView>();
-        private int _listingRevision;
         private List<DiskEntry> _trail = new List<DiskEntry>();
         private DiskEntry _rowPressed;
         private Point _rowPressPoint;
@@ -316,23 +314,12 @@ namespace DiskBubbles
             FolderView view = restoreView && _folderViews.TryGetValue(current, out FolderView remembered) ? remembered : null;
             _map.ShowEntries(current, view?.MapPage ?? 0, origin, returning, animate);
             UpdateMapPager();
-            _listingRevision++;
             _rowPressed = null;
             _entries.ItemsSource = current.Children;
             _entries.SelectedItem = null;
-            if (current.Children.Count > 0)
-                _entries.ScrollIntoView(current.Children[0]);
+            ListingScrollViewer(_entries)?.ScrollToVerticalOffset(view?.Offset ?? 0);
             _itemCount.Text = current.Children.Count > 1 ? $"{CountLabel(current.Children.Count, "item")} · largest first"
                 : CountLabel(current.Children.Count, "item");
-            if (view != null && view.Offset > 0)
-            {
-                int revision = _listingRevision;
-                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
-                {
-                    if (revision == _listingRevision)
-                        ListingScrollViewer(_entries)?.ScrollToVerticalOffset(view.Offset);
-                }));
-            }
             _mapEmpty.Text = "This folder is empty";
             _mapEmpty.Visibility = current.Children.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             _total.Text = current.SizeLabel;
