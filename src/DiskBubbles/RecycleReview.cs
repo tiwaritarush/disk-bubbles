@@ -51,6 +51,8 @@ namespace DiskBubbles
             if (items.Count > 0)
             {
                 string location = Path.GetDirectoryName(items[0].Path);
+                if (items.Any(item => !string.Equals(Path.GetDirectoryName(item.Path), location, StringComparison.Ordinal)))
+                    location = "Across multiple folders";
                 var path = Label(location, 12, "Muted");
                 path.TextWrapping = TextWrapping.NoWrap;
                 path.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -86,9 +88,9 @@ namespace DiskBubbles
                 content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(245) });
                 var preview = new StackPanel { Margin = new Thickness(17, 16, 16, 15) };
                 preview.Children.Add(Label("After the move", 16, "Ink", FontWeights.SemiBold));
-                AddProjection(preview, "Current folder", current.Bytes, bytes);
-                if (root != current)
-                    AddProjection(preview, "Entire scan", root.Bytes, bytes);
+                if (current != null && current != root)
+                    AddProjection(preview, "Current folder", current.Bytes, bytes);
+                AddProjection(preview, "Entire scan", root.Bytes, bytes);
                 var previewPanel = UiVisuals.Surface(new Border
                 {
                     BorderThickness = new Thickness(1, 0, 0, 0),

@@ -26,6 +26,8 @@ namespace DiskBubbles
         public bool IsFolder => Children != null;
         public string SizeLabel => FormatSize(Bytes);
         public bool IsSystem => IsFolder && (Protection & EntryProtection.CriticalFolder) != 0;
+        public bool CanMark => Protection == EntryProtection.None;
+        public bool IsMarked { get; internal set; }
         public string AccessibleName => Name + ", " + SizeLabel + (IsSystem ? ", critical Windows folder" : "");
         internal EntryProtection Protection { get; set; }
         internal List<DiskEntry> Children { get; }

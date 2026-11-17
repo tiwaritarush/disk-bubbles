@@ -123,9 +123,6 @@ namespace DiskBubbles
 
     internal static class GlassOrb
     {
-        public const double GridStep = 30;
-        public const double GridInset = 16;
-        private static readonly Brush LensDot = new SolidColorBrush(Color.FromArgb(36, 210, 216, 231));
         private static readonly Brush Shadow = new RadialGradientBrush(Color.FromArgb(141, 7, 7, 9), Color.FromArgb(0, 7, 7, 9));
         private static readonly Brush LightShadow = FrostGradient(new Point(0.5, 0.5), 0.5, 0.5,
             (0, 77, 70, 66, 53), (0.57, 46, 70, 66, 53), (0.83, 18, 70, 66, 53), (1, 0, 70, 66, 53));
@@ -135,15 +132,13 @@ namespace DiskBubbles
             (0.62, 0, 255, 255, 252), (0.83, 30, 255, 255, 252), (0.95, 111, 255, 255, 252), (1, 167, 255, 255, 252));
         private static readonly Brush LightGlint = FrostGradient(new Point(0.25, 0.13), 0.49, 0.28,
             (0, 197, 255, 255, 255), (0.42, 91, 255, 255, 255), (1, 0, 255, 255, 255));
-        private static readonly Brush LightDiffusedDot = FrostGradient(new Point(0.5, 0.5), 0.5, 0.5,
-            (0, 52, 64, 75, 78), (0.35, 23, 64, 75, 78), (1, 0, 64, 75, 78));
         private static readonly Lazy<Brush> FrostGrain = new Lazy<Brush>(CreateFrostGrain);
 
-        public static void Draw(DrawingContext drawing, Point center, double radius, Color tone, bool grouped = false, bool hasGrid = true)
+        public static void Draw(DrawingContext drawing, Point center, double radius, Color tone)
         {
             if (Appearance.IsLight)
             {
-                DrawLight(drawing, center, radius, tone, grouped, hasGrid);
+                DrawLight(drawing, center, radius, tone);
                 return;
             }
             if (radius >= 14)
@@ -161,7 +156,6 @@ namespace DiskBubbles
 
             if (radius >= 20)
             {
-                DrawLensGrid(drawing, center, radius);
                 var refractedLight = new RadialGradientBrush
                 {
                     Center = new Point(0.66, 0.95), GradientOrigin = new Point(0.71, 1.01), RadiusX = 0.53, RadiusY = 0.31,
@@ -193,8 +187,6 @@ namespace DiskBubbles
             edge.GradientStops.Add(new GradientStop(Alpha(tone, 61), 0.69));
             edge.GradientStops.Add(new GradientStop(Alpha(tone, 209), 1));
             var rim = new Pen(edge, radius > 50 ? 1.35 : 1.05);
-            if (grouped)
-                rim.DashStyle = DashStyles.Dot;
             drawing.DrawEllipse(null, rim, center, radius, radius);
 
             if (radius >= 35)
@@ -205,7 +197,7 @@ namespace DiskBubbles
             }
         }
 
-        private static void DrawLight(DrawingContext drawing, Point center, double radius, Color tone, bool grouped, bool hasGrid)
+        private static void DrawLight(DrawingContext drawing, Point center, double radius, Color tone)
         {
             if (radius >= 14)
                 drawing.DrawEllipse(LightShadow, null, new Point(center.X + 4, center.Y + 8), radius * 1.15, radius * 1.14);
@@ -213,9 +205,6 @@ namespace DiskBubbles
             drawing.DrawEllipse(LightBody, null, center, radius, radius);
             if (radius >= 17)
             {
-                if (hasGrid)
-                    DrawLensGrid(drawing, center, radius, frosted: true);
-
                 var refraction = new RadialGradientBrush
                 {
                     Center = new Point(0.53, 0.88), GradientOrigin = new Point(0.71, 1.04), RadiusX = 0.64, RadiusY = 0.38,
@@ -235,8 +224,6 @@ namespace DiskBubbles
             edge.GradientStops.Add(new GradientStop(Color.FromArgb(125, 145, 136, 119), 0.64));
             edge.GradientStops.Add(new GradientStop(Color.FromArgb(177, 122, 132, 130), 1));
             var rim = new Pen(edge, radius >= 50 ? 1.55 : 1.2);
-            if (grouped)
-                rim.DashStyle = DashStyles.Dot;
             drawing.DrawEllipse(null, rim, center, radius, radius);
             if (radius >= 23)
             {
@@ -276,50 +263,6 @@ namespace DiskBubbles
             };
             grain.Freeze();
             return grain;
-        }
-
-        public static void ReflectPointer(DrawingContext drawing, Point center, double radius, Point pointer)
-        {
-            var local = new Point((pointer.X - center.X + radius) / (2 * radius), (pointer.Y - center.Y + radius) / (2 * radius));
-            var reflection = new RadialGradientBrush
-            {
-                Center = local, GradientOrigin = local, RadiusX = 0.32, RadiusY = 0.25,
-            };
-            reflection.GradientStops.Add(new GradientStop(Appearance.IsLight ? Color.FromArgb(124, 255, 255, 255)
-                : Color.FromArgb(61, 239, 246, 255), 0));
-            reflection.GradientStops.Add(new GradientStop(Color.FromArgb(0, 239, 246, 255), 1));
-            drawing.DrawEllipse(reflection, null, center, radius - 1, radius - 1);
-
-            Vector offset = pointer - center;
-            if (offset.LengthSquared > radius * radius * 0.09)
-            {
-                double angle = Math.Atan2(offset.Y, offset.X) * 180 / Math.PI;
-                DrawArc(drawing, center, radius - 1.2, angle - 28, angle + 28,
-                    Color.FromArgb(163, 244, 247, 255), Color.FromArgb(8, 244, 247, 255), 1.65);
-            }
-        }
-
-        private static void DrawLensGrid(DrawingContext drawing, Point center, double radius, bool frosted = false)
-        {
-            double left = GridInset + Math.Ceiling((center.X - radius - GridInset) / GridStep) * GridStep;
-            double top = GridInset + Math.Ceiling((center.Y - radius - GridInset) / GridStep) * GridStep;
-            double radiusSquared = radius * radius;
-            for (double y = top; y < center.Y + radius; y += GridStep)
-            {
-                for (double x = left; x < center.X + radius; x += GridStep)
-                {
-                    Vector offset = new Point(x, y) - center;
-                    double distance = offset.LengthSquared / radiusSquared;
-                    if (distance >= 0.88)
-                        continue;
-
-                    double magnification = 1 + 0.32 * (1 - distance);
-                    double dot = (frosted ? 2.6 : 0.66) * magnification;
-                    Point refracted = center + offset * magnification;
-                    if (!frosted || (refracted - center).Length + dot <= radius)
-                        drawing.DrawEllipse(frosted ? LightDiffusedDot : LensDot, null, refracted, dot, dot);
-                }
-            }
         }
 
         private static void DrawArc(DrawingContext drawing, Point center, double radius, double fromAngle, double toAngle,
@@ -368,9 +311,9 @@ namespace DiskBubbles
             drawing.Pop();
             Color lens = Appearance.IsLight ? Color.FromRgb(168, 185, 188) : Silver;
             Color smallLens = Appearance.IsLight ? Color.FromRgb(191, 184, 169) : Smoke;
-            GlassOrb.Draw(drawing, center, 119, lens, hasGrid: false);
-            GlassOrb.Draw(drawing, new Point(346, 95), 44, smallLens, hasGrid: false);
-            GlassOrb.Draw(drawing, new Point(91, 244), 42, lens, hasGrid: false);
+            GlassOrb.Draw(drawing, center, 119, lens);
+            GlassOrb.Draw(drawing, new Point(346, 95), 44, smallLens);
+            GlassOrb.Draw(drawing, new Point(91, 244), 42, lens);
 
             drawing.PushTransform(new TranslateTransform(185, 162));
             drawing.PushTransform(new ScaleTransform(3.12, 3.12));

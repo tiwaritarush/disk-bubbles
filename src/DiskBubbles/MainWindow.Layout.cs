@@ -111,7 +111,7 @@ namespace DiskBubbles
             _browser.Children.Add(navigation);
 
             var panels = new Grid();
-            panels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 263, MaxWidth = 384 });
+            panels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 278, MaxWidth = 384 });
             panels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2.32, GridUnitType.Star) });
             var itemPanel = UiVisuals.Surface(new Border
             {
@@ -131,7 +131,7 @@ namespace DiskBubbles
             _status.TextAlignment = TextAlignment.Right;
             _status.VerticalAlignment = VerticalAlignment.Center;
             _status.Margin = new Thickness(20, 0, 0, 0);
-            _capacityPanel.Width = 281;
+            _capacityPanel.Width = 205;
             FormatLabel(_capacity, 11, "Ink", FontWeights.SemiBold);
             _capacityBar.SetResourceReference(Control.ForegroundProperty, "Accent");
             _capacityBar.SetResourceReference(Control.BackgroundProperty, "Line");
@@ -143,6 +143,23 @@ namespace DiskBubbles
             AutomationProperties.SetName(_capacityBar, "Volume used space");
             DockPanel.SetDock(_capacityPanel, Dock.Left);
             footer.Children.Add(_capacityPanel);
+            var cleanup = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 0, 0) };
+            FormatLabel(_selectionSummary, 12, "Ink", FontWeights.SemiBold);
+            _selectionSummary.VerticalAlignment = VerticalAlignment.Center;
+            cleanup.Children.Add(_selectionSummary);
+            _clearMarks.Style = (Style)FindResource("QuietButton");
+            _clearMarks.Margin = new Thickness(6, 0, 4, 0);
+            AutomationProperties.SetName(_clearMarks, "Clear all marked items");
+            cleanup.Children.Add(_clearMarks);
+            _reviewRecycle.Content = UiVisuals.Icon(UiVisuals.Bin, "AccentInk", 17);
+            _reviewRecycle.ToolTip = "Review marked items for the Recycle Bin";
+            _reviewRecycle.Width = 38;
+            _reviewRecycle.Padding = new Thickness(7);
+            UiVisuals.Emphasize(_reviewRecycle);
+            AutomationProperties.SetName(_reviewRecycle, "Review marked items for the Recycle Bin");
+            cleanup.Children.Add(_reviewRecycle);
+            DockPanel.SetDock(cleanup, Dock.Right);
+            footer.Children.Add(cleanup);
             footer.Children.Add(_status);
             Grid.SetRow(footer, 2);
             _browser.Children.Add(footer);
@@ -159,31 +176,10 @@ namespace DiskBubbles
             DockPanel.SetDock(heading, Dock.Top);
             sidebar.Children.Add(heading);
 
-            var actions = new StackPanel();
-            FormatLabel(_selectionSummary, 12, "Ink", FontWeights.SemiBold);
-            _selectionSummary.Margin = new Thickness(5, 0, 5, 9);
-            actions.Children.Add(_selectionSummary);
-            UiVisuals.Emphasize(_reviewRecycle);
-            actions.Children.Add(_reviewRecycle);
-            _entryAction.Margin = new Thickness(0, 6, 0, 0);
-            actions.Children.Add(_entryAction);
-            _selectionPane.Margin = new Thickness(1, 8, 4, 0);
-            _selectionPane.Padding = new Thickness(0, 10, 0, 0);
-            _selectionPane.SetResourceReference(Border.BorderBrushProperty, "Line");
-            _selectionPane.BorderThickness = new Thickness(0, 1, 0, 0);
-            _selectionPane.Child = actions;
-            DockPanel.SetDock(_selectionPane, Dock.Bottom);
-            sidebar.Children.Add(_selectionPane);
-            DockPanel.SetDock(_otherToggle, Dock.Bottom);
-            _otherToggle.Margin = new Thickness(1, 9, 4, 0);
-            _otherToggle.Style = (Style)FindResource("QuietButton");
-            sidebar.Children.Add(_otherToggle);
-
             _entries.Background = Brushes.Transparent;
             _entries.BorderThickness = new Thickness(0);
             _entries.ItemContainerStyle = (Style)FindResource("EntryRow");
             _entries.ItemTemplate = (DataTemplate)FindResource("EntryTemplate");
-            _entries.SelectionMode = SelectionMode.Extended;
             _entries.SetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Disabled);
             _entries.SetValue(VirtualizingPanel.VirtualizationModeProperty, VirtualizationMode.Recycling);
             AutomationProperties.SetName(_entries, "Folders and files, largest first");
@@ -214,6 +210,32 @@ namespace DiskBubbles
             heading.Children.Add(name);
             DockPanel.SetDock(heading, Dock.Top);
             chart.Children.Add(heading);
+
+            _mapPager.Orientation = Orientation.Horizontal;
+            _mapPager.HorizontalAlignment = HorizontalAlignment.Center;
+            _mapPager.Margin = new Thickness(0, 0, 0, 10);
+            _mapPrevious.Content = UiVisuals.Icon(UiVisuals.Back, "Ink", 12);
+            _mapNext.Content = UiVisuals.Icon(UiVisuals.Forward, "Ink", 12);
+            _mapPrevious.ToolTip = "Previous bubbles";
+            _mapNext.ToolTip = "Next bubbles";
+            AutomationProperties.SetName(_mapPrevious, "Previous bubbles");
+            AutomationProperties.SetName(_mapNext, "Next bubbles");
+            foreach (var button in new[] { _mapPrevious, _mapNext })
+            {
+                button.Style = (Style)FindResource("QuietButton");
+                button.MinHeight = 30;
+                button.Width = 32;
+                button.Padding = new Thickness(5);
+            }
+            FormatLabel(_mapRange, 12, "Muted");
+            _mapRange.Margin = new Thickness(8, 0, 8, 0);
+            _mapRange.VerticalAlignment = VerticalAlignment.Center;
+            _mapRange.ToolTip = "Sorted by size. Each item has a bubble. Small items use a minimum visible size.";
+            _mapPager.Children.Add(_mapPrevious);
+            _mapPager.Children.Add(_mapRange);
+            _mapPager.Children.Add(_mapNext);
+            DockPanel.SetDock(_mapPager, Dock.Bottom);
+            chart.Children.Add(_mapPager);
 
             var plot = new Grid();
             plot.Children.Add(_map);

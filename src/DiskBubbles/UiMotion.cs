@@ -9,9 +9,9 @@ namespace DiskBubbles
 {
     internal static class UiMotion
     {
-        public const int HoverMs = 125;
-        public const int ZoomMs = 300;
-        public const int ZoomFadeMs = 225;
+        public const int HoverMs = 100;
+        public const int ZoomMs = 215;
+        public const int ZoomFadeMs = 155;
         public const int RevealMs = 210;
         public const int DialogEnterMs = 225;
         public const int DialogExitMs = 170;
