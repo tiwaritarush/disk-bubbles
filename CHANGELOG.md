@@ -1,5 +1,9 @@
 # Changelog
 
+## 10.3.4
+
+- Keep pink and green reflections inside the glass bubbles and remove the ambient glow from the backgrounds.
+
 ## 10.3.3
 
 - Use cream for the light workspace and ink for primary controls and folder icons.

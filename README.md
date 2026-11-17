@@ -14,7 +14,7 @@ Windows can tell you that a drive is nearly full. Figuring out which project, do
 - **Explore by size.** Click a folder in the list or on the map to open it. Hover to see its size and share of the current folder. Use the map arrows to see smaller entries, including empty ones. Back and Forward remember your scroll position and map page.
 - **Mark items as you browse.** Check files or folders anywhere in the scan. Use the trash icon at the bottom right to review everything together. The app protects critical Windows locations and verifies file identities before asking Windows to move anything.
 - **Review installed apps.** App Cleaner shows scan progress, then lists desktop and Store apps with their registered icons and measured install sizes where available. Review uninstall actions or check for folders left after a desktop uninstall.
-- **Switch between light and dark.** The glass sits over a soft pink blush in the cream theme and green in the midnight theme. The app remembers your choice and follows the Windows animation setting.
+- **Switch between light and dark.** The bubbles catch a pink reflection in the cream theme and a green one in the midnight theme. The app remembers your choice and follows the Windows animation setting.
 
 ![Disk Bubbles in the cream and ink theme with frosted glass bubbles.](docs/screenshots/light.png)
 

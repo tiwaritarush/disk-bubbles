@@ -167,9 +167,7 @@ namespace DiskBubbles
             side.SetResourceReference(Border.BorderBrushProperty, "Line");
             SetColumn(side, 1);
             columns.Children.Add(side);
-            var glass = new Grid();
-            glass.Children.Add(new GlassBackdrop(0.66, 0.64, focused: false));
-            glass.Children.Add(UiVisuals.Surface(new Border { Child = columns, CornerRadius = new CornerRadius(15) }, "GlassPane"));
+            var glass = UiVisuals.Surface(new Border { Child = columns, CornerRadius = new CornerRadius(15) }, "GlassPane");
             var card = UiVisuals.Surface(new Border { Child = glass, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(15) }, "Chart", "GlassEdge");
             SetRow(card, 1);
             _results.Children.Add(card);

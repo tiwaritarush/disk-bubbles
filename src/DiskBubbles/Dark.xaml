@@ -5,7 +5,7 @@
   <SolidColorBrush x:Key="Subtle" Color="#8D9EAD" />
   <SolidColorBrush x:Key="Line" Color="#2A3545" />
   <SolidColorBrush x:Key="Base" Color="#000412" />
-  <SolidColorBrush x:Key="Atmosphere" Color="#2BF08A" />
+  <SolidColorBrush x:Key="BubbleTint" Color="#2BF08A" />
   <SolidColorBrush x:Key="Accent" Color="#A6C5B9" />
   <SolidColorBrush x:Key="AccentInk" Color="#E8EEF2" />
   <SolidColorBrush x:Key="Attention" Color="#F0C3A8" />

@@ -166,9 +166,6 @@ namespace DiskBubbles
             var panels = new Grid();
             panels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 278, MaxWidth = 384 });
             panels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2.32, GridUnitType.Star) });
-            var reflection = new GlassBackdrop(0.60, 0.69);
-            Grid.SetColumnSpan(reflection, 2);
-            panels.Children.Add(reflection);
             var itemPanel = UiVisuals.Surface(new Border
             {
                 BorderThickness = new Thickness(0, 0, 1, 0),

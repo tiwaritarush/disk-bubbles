@@ -120,14 +120,14 @@ internal static class Verification
                 capacityMeter.Value = 0.625;
                 Assert(((SolidColorBrush)window.Background).Color == Color.FromRgb(0, 4, 18) &&
                     ((SolidColorBrush)window.Foreground).Color == Color.FromRgb(232, 238, 242) &&
-                    ((SolidColorBrush)window.FindResource("Atmosphere")).Color == Color.FromRgb(43, 240, 138),
-                    "The dark appearance did not use the midnight, ice and aurora palette.");
+                    ((SolidColorBrush)window.FindResource("BubbleTint")).Color == Color.FromRgb(43, 240, 138),
+                    "The dark appearance did not use midnight, ice and green glass.");
                 await Capture(window, Path.Combine(fixture, "../preview.png"));
                 await Capture(window, Path.Combine(fixture, "../preview-2x.png"), 192);
                 setAppearance.Invoke(window, new object[] { true });
                 Assert(((SolidColorBrush)window.Background).Color == Color.FromRgb(236, 230, 220) &&
                     ((SolidColorBrush)window.Foreground).Color == Color.FromRgb(5, 5, 5) &&
-                    ((SolidColorBrush)window.FindResource("Atmosphere")).Color == Color.FromRgb(230, 91, 196) &&
+                    ((SolidColorBrush)window.FindResource("BubbleTint")).Color == Color.FromRgb(230, 91, 196) &&
                     displayPath.Text == @"D:\Storage sample",
                     "The light appearance failed to update in place.");
                 await Capture(window, Path.Combine(fixture, "../preview-light.png"));

@@ -127,20 +127,19 @@ namespace DiskBubbles
         private static GlassLight _dark;
         public static GlassLight Current => Appearance.IsLight ? (_light ??= new GlassLight(true)) : (_dark ??= new GlassLight(false));
 
-        private readonly Brush _spread;
-        private readonly Brush _glow;
-        private readonly Brush _core;
         private readonly Brush _reflection;
         private readonly Pen _rim;
 
         private GlassLight(bool light)
         {
-            Color tint = ((SolidColorBrush)Application.Current.FindResource("Atmosphere")).Color;
-            var middle = new Point(0.5, 0.5);
-            _spread = Fade(tint, middle, 0.5, 0.5, light ? (byte)62 : (byte)51);
-            _glow = Fade(tint, middle, 0.5, 0.5, light ? (byte)74 : (byte)65);
-            _core = Fade(tint, middle, 0.5, 0.5, light ? (byte)68 : (byte)80);
-            _reflection = Fade(tint, new Point(0.51, 0.94), 0.56, 0.28, light ? (byte)57 : (byte)49);
+            Color tint = ((SolidColorBrush)Application.Current.FindResource("BubbleTint")).Color;
+            var center = new Point(0.51, 0.94);
+            var reflection = new RadialGradientBrush { Center = center, GradientOrigin = center, RadiusX = 0.56, RadiusY = 0.28 };
+            reflection.GradientStops.Add(new GradientStop(Alpha(tint, light ? (byte)57 : (byte)49), 0));
+            reflection.GradientStops.Add(new GradientStop(Alpha(tint, light ? (byte)23 : (byte)20), 0.53));
+            reflection.GradientStops.Add(new GradientStop(Alpha(tint, 0), 1));
+            reflection.Freeze();
+            _reflection = reflection;
 
             var rim = new LinearGradientBrush { StartPoint = new Point(0.5, 0), EndPoint = new Point(0.5, 1) };
             rim.GradientStops.Add(new GradientStop(Alpha(tint, 0), 0.74));
@@ -148,21 +147,6 @@ namespace DiskBubbles
             rim.GradientStops.Add(new GradientStop(Alpha(tint, light ? (byte)145 : (byte)140), 1));
             _rim = new Pen(rim, 1.45);
             _rim.Freeze();
-        }
-
-        public void DrawSpread(DrawingContext drawing, Rect bounds, Point origin, bool focused = true)
-        {
-            if (SystemParameters.HighContrast || bounds.IsEmpty || bounds.Width <= 0 || bounds.Height <= 0)
-                return;
-
-            var center = new Point(bounds.X + bounds.Width * origin.X, bounds.Y + bounds.Height * origin.Y);
-            double width = bounds.Width * Math.Min(origin.X, 1 - origin.X);
-            double height = bounds.Height * Math.Min(origin.Y, 1 - origin.Y);
-            drawing.DrawEllipse(_spread, null, center, width, height);
-            if (!focused)
-                return;
-            drawing.DrawEllipse(_glow, null, center, width * 0.92, height * 0.45);
-            drawing.DrawEllipse(_core, null, center, width * 0.76, height * 0.13);
         }
 
         public void DrawReflection(DrawingContext drawing, Point center, double radius)
@@ -174,35 +158,7 @@ namespace DiskBubbles
             drawing.DrawEllipse(null, _rim, center, inset, inset);
         }
 
-        private static Brush Fade(Color tint, Point center, double x, double y, byte strength)
-        {
-            var brush = new RadialGradientBrush { Center = center, GradientOrigin = center, RadiusX = x, RadiusY = y };
-            brush.GradientStops.Add(new GradientStop(Alpha(tint, strength), 0));
-            brush.GradientStops.Add(new GradientStop(Alpha(tint, (byte)(strength * 0.42)), 0.53));
-            brush.GradientStops.Add(new GradientStop(Alpha(tint, 0), 1));
-            brush.Freeze();
-            return brush;
-        }
-
         private static Color Alpha(Color color, byte alpha) => Color.FromArgb(alpha, color.R, color.G, color.B);
-    }
-
-    internal sealed class GlassBackdrop : FrameworkElement
-    {
-        private static readonly DependencyProperty TintProperty = DependencyProperty.Register("Tint", typeof(Brush), typeof(GlassBackdrop),
-            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
-        private readonly Point _origin;
-        private readonly bool _focused;
-
-        public GlassBackdrop(double x, double y, bool focused = true)
-        {
-            _origin = new Point(x, y);
-            _focused = focused;
-            IsHitTestVisible = false;
-            SetResourceReference(TintProperty, "Atmosphere");
-        }
-
-        protected override void OnRender(DrawingContext drawing) => GlassLight.Current.DrawSpread(drawing, new Rect(RenderSize), _origin, _focused);
     }
 
     internal static class GlassOrb
@@ -367,7 +323,6 @@ namespace DiskBubbles
             drawing.PushTransform(new TranslateTransform((ActualWidth - width * scale) / 2, (ActualHeight - height * scale) / 2));
             drawing.PushTransform(new ScaleTransform(scale, scale));
 
-            GlassLight.Current.DrawSpread(drawing, new Rect(0, 0, width, height), new Point(0.5, 0.69));
             Color lens = Appearance.IsLight ? Color.FromRgb(181, 180, 185) : Color.FromRgb(159, 186, 201);
             Color smallLens = Appearance.IsLight ? Color.FromRgb(175, 174, 177) : Color.FromRgb(162, 175, 191);
             GlassOrb.Draw(drawing, center, 52, lens);
