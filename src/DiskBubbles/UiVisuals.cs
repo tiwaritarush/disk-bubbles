@@ -52,6 +52,14 @@ namespace DiskBubbles
             return border;
         }
 
+        public static Border FrostedPane(UIElement content, string fill = "GlassPane")
+        {
+            var inner = Surface(new Border { CornerRadius = new CornerRadius(18), BorderThickness = new Thickness(1), Child = content },
+                fill, "GlassInner");
+            return Surface(new Border { CornerRadius = new CornerRadius(19), BorderThickness = new Thickness(1), Child = inner },
+                "Chart", "GlassEdge");
+        }
+
         public static void Emphasize(Button button)
         {
             button.SetResourceReference(Control.BackgroundProperty, "AccentFill");
@@ -121,190 +129,86 @@ namespace DiskBubbles
         private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
     }
 
-    internal sealed class GlassLight
+    internal sealed class GlassOrb
     {
-        private static GlassLight _light;
-        private static GlassLight _dark;
-        public static GlassLight Current => Appearance.IsLight ? (_light ??= new GlassLight(true)) : (_dark ??= new GlassLight(false));
+        private static GlassOrb _light;
+        private static GlassOrb _dark;
 
-        private readonly Brush _reflection;
-        private readonly Pen _rim;
+        private readonly Brush _shadow;
+        private readonly Brush _body;
+        private readonly Brush _frost;
+        private readonly Brush _tint;
+        private readonly Brush _bevel;
+        private readonly Pen _edge;
 
-        private GlassLight(bool light)
+        private GlassOrb(bool light)
         {
+            var center = new Point(0.5, 0.5);
+            var cloudySide = new Point(0.26, 0.24);
             Color tint = ((SolidColorBrush)Application.Current.FindResource("BubbleTint")).Color;
-            var center = new Point(0.51, 0.94);
-            var reflection = new RadialGradientBrush { Center = center, GradientOrigin = center, RadiusX = 0.56, RadiusY = 0.28 };
-            reflection.GradientStops.Add(new GradientStop(Alpha(tint, light ? (byte)57 : (byte)49), 0));
-            reflection.GradientStops.Add(new GradientStop(Alpha(tint, light ? (byte)23 : (byte)20), 0.53));
-            reflection.GradientStops.Add(new GradientStop(Alpha(tint, 0), 1));
-            reflection.Freeze();
-            _reflection = reflection;
+            uint rgb = (uint)(tint.R << 16 | tint.G << 8 | tint.B);
+            _tint = Radial(new Point(0.54, 0.93), 0.65, 0.38,
+                (0, rgb | (light ? 0x64000000u : 0x57000000u)), (0.44, rgb | 0x38000000u),
+                (0.73, rgb | 0x15000000u), (1, rgb));
 
-            var rim = new LinearGradientBrush { StartPoint = new Point(0.5, 0), EndPoint = new Point(0.5, 1) };
-            rim.GradientStops.Add(new GradientStop(Alpha(tint, 0), 0.74));
-            rim.GradientStops.Add(new GradientStop(Alpha(tint, 35), 0.91));
-            rim.GradientStops.Add(new GradientStop(Alpha(tint, light ? (byte)145 : (byte)140), 1));
-            _rim = new Pen(rim, 1.45);
-            _rim.Freeze();
-        }
-
-        public void DrawReflection(DrawingContext drawing, Point center, double radius)
-        {
-            if (SystemParameters.HighContrast || radius < 12)
-                return;
-            drawing.DrawEllipse(_reflection, null, center, radius, radius);
-            double inset = radius - Math.Min(3, radius * 0.07);
-            drawing.DrawEllipse(null, _rim, center, inset, inset);
-        }
-
-        private static Color Alpha(Color color, byte alpha) => Color.FromArgb(alpha, color.R, color.G, color.B);
-    }
-
-    internal static class GlassOrb
-    {
-        private static readonly Brush Shadow = new RadialGradientBrush(Color.FromArgb(141, 7, 7, 9), Color.FromArgb(0, 7, 7, 9));
-        private static readonly Brush LightShadow = FrostGradient(new Point(0.5, 0.5), 0.5, 0.5,
-            (0, 77, 70, 66, 53), (0.57, 46, 70, 66, 53), (0.83, 18, 70, 66, 53), (1, 0, 70, 66, 53));
-        private static readonly Brush LightBody = FrostGradient(new Point(0.3, 0.17), 0.82, 0.94,
-            (0, 218, 255, 255, 255), (0.47, 109, 255, 255, 253), (0.73, 75, 255, 255, 251), (1, 131, 255, 255, 254));
-        private static readonly Brush LightRimFrost = FrostGradient(new Point(0.5, 0.5), 0.5, 0.5,
-            (0.62, 0, 255, 255, 252), (0.83, 30, 255, 255, 252), (0.95, 111, 255, 255, 252), (1, 167, 255, 255, 252));
-        private static readonly Brush LightGlint = FrostGradient(new Point(0.25, 0.13), 0.49, 0.28,
-            (0, 197, 255, 255, 255), (0.42, 91, 255, 255, 255), (1, 0, 255, 255, 255));
-
-        public static void Draw(DrawingContext drawing, Point center, double radius, Color tone)
-        {
-            if (Appearance.IsLight)
+            if (light)
             {
-                DrawLight(drawing, center, radius, tone);
-                return;
+                _shadow = Radial(center, 0.5, 0.5, (0, 0x4C4C453D), (0.56, 0x304C453D), (1, 0x004C453D));
+                _body = Linear(new Point(0.18, 0), new Point(0.65, 1),
+                    (0, 0xD6FEFCF9), (0.38, 0xA4F9F6F1), (0.71, 0x82EEEAE6), (1, 0xABFFFDF9));
+                _frost = Radial(cloudySide, 0.73, 0.64,
+                    (0, 0x9EFFFFFF), (0.38, 0x61FFFFFF), (0.78, 0x13FFFFFF), (1, 0x00FFFFFF));
+                _bevel = Radial(new Point(0.51, 0.48), 0.50, 0.51,
+                    (0.69, 0x00FFFCF9), (0.85, 0x1BFFFCF9), (0.94, 0x54FFFCF9), (1, 0xA2FFFCF9));
+                _edge = Edge((0, 0xF4FFFFFF), (0.42, 0xBAFFFDF8), (0.73, 0x988D857D), (1, 0x60B3AAA4));
             }
+            else
+            {
+                _shadow = Radial(center, 0.5, 0.5, (0, 0x96000209), (0.55, 0x62000209), (1, 0x00000209));
+                _body = Linear(new Point(0.15, 0), new Point(0.67, 1),
+                    (0, 0xCC4C5967), (0.37, 0xB635414E), (0.7, 0xA525323E), (1, 0xC43C4954));
+                _frost = Radial(cloudySide, 0.68, 0.63,
+                    (0, 0x65E8EEF2), (0.43, 0x35E8EEF2), (0.77, 0x0CE8EEF2), (1, 0x00E8EEF2));
+                _bevel = Radial(new Point(0.51, 0.48), 0.50, 0.51,
+                    (0.71, 0x00E8EEF2), (0.85, 0x13E8EEF2), (0.95, 0x36E8EEF2), (1, 0x6AE8EEF2));
+                _edge = Edge((0, 0xCFE8EEF2), (0.40, 0x7BB8CAD4), (0.74, 0x35566777), (1, 0x868F9DA8));
+            }
+        }
+
+        public static void Draw(DrawingContext drawing, Point center, double radius)
+        {
+            bool light = Appearance.IsLight;
+            var glass = light ? (_light ??= new GlassOrb(true)) : (_dark ??= new GlassOrb(false));
             if (radius >= 14)
-                drawing.DrawEllipse(Shadow, null, new Point(center.X + 2, center.Y + 5), radius * 1.16, radius * 1.14);
+                drawing.DrawEllipse(glass._shadow, null, new Point(center.X + 3, center.Y + 6), radius * 1.09, radius * 1.08);
 
-            var body = new RadialGradientBrush
-            {
-                Center = new Point(0.45, 0.49), GradientOrigin = new Point(0.29, 0.18), RadiusX = 0.72, RadiusY = 0.82,
-            };
-            body.GradientStops.Add(new GradientStop(Tint(tone, 0.36, 216), 0));
-            body.GradientStops.Add(new GradientStop(Tint(tone, 0.15, 186), 0.47));
-            body.GradientStops.Add(new GradientStop(Tint(tone, 0.09, 178), 0.75));
-            body.GradientStops.Add(new GradientStop(Tint(tone, 0.22, 211), 1));
-            drawing.DrawEllipse(body, null, center, radius, radius);
-
-            if (radius >= 20)
-            {
-                var refractedLight = new RadialGradientBrush
-                {
-                    Center = new Point(0.66, 0.95), GradientOrigin = new Point(0.71, 1.01), RadiusX = 0.53, RadiusY = 0.31,
-                };
-                refractedLight.GradientStops.Add(new GradientStop(Alpha(tone, 113), 0));
-                refractedLight.GradientStops.Add(new GradientStop(Alpha(tone, 36), 0.54));
-                refractedLight.GradientStops.Add(new GradientStop(Alpha(tone, 0), 1));
-                drawing.DrawEllipse(refractedLight, null, center, radius, radius);
-
-                var sheen = new RadialGradientBrush
-                {
-                    Center = new Point(0.28, 0.16), GradientOrigin = new Point(0.24, 0.08), RadiusX = 0.47, RadiusY = 0.32,
-                };
-                sheen.GradientStops.Add(new GradientStop(Color.FromArgb(91, 246, 246, 252), 0));
-                sheen.GradientStops.Add(new GradientStop(Color.FromArgb(22, 246, 246, 252), 0.55));
-                sheen.GradientStops.Add(new GradientStop(Color.FromArgb(0, 246, 246, 252), 1));
-                drawing.DrawEllipse(sheen, null, center, radius, radius);
-
-                var innerLight = new RadialGradientBrush { RadiusX = 0.5, RadiusY = 0.5 };
-                innerLight.GradientStops.Add(new GradientStop(Alpha(tone, 0), 0.76));
-                innerLight.GradientStops.Add(new GradientStop(Alpha(tone, 23), 0.93));
-                innerLight.GradientStops.Add(new GradientStop(Alpha(tone, 44), 1));
-                drawing.DrawEllipse(innerLight, null, center, radius, radius);
-            }
-
-            var edge = new LinearGradientBrush { StartPoint = new Point(0.18, 0), EndPoint = new Point(0.72, 1) };
-            edge.GradientStops.Add(new GradientStop(Color.FromArgb(206, 245, 245, 250), 0));
-            edge.GradientStops.Add(new GradientStop(Alpha(tone, 154), 0.32));
-            edge.GradientStops.Add(new GradientStop(Alpha(tone, 61), 0.69));
-            edge.GradientStops.Add(new GradientStop(Alpha(tone, 209), 1));
-            var rim = new Pen(edge, radius > 50 ? 1.35 : 1.05);
-            drawing.DrawEllipse(null, rim, center, radius, radius);
-
-            if (radius >= 35)
-            {
-                double inner = radius - Math.Min(3, radius * 0.04);
-                DrawArc(drawing, center, inner, -142, -79, Color.FromArgb(136, 245, 245, 250), Alpha(tone, 30), 0.95);
-                DrawArc(drawing, center, inner, 33, 107, Alpha(tone, 153), Alpha(tone, 28), 1.15);
-            }
-            GlassLight.Current.DrawReflection(drawing, center, radius);
+            drawing.DrawEllipse(glass._body, null, center, radius, radius);
+            drawing.DrawEllipse(glass._frost, null, center, radius, radius);
+            if (!SystemParameters.HighContrast)
+                drawing.DrawEllipse(glass._tint, null, center, radius, radius);
+            drawing.DrawEllipse(glass._bevel, glass._edge, center, radius, radius);
         }
 
-        private static void DrawLight(DrawingContext drawing, Point center, double radius, Color tone)
+        private static Pen Edge(params (double Offset, uint Argb)[] stops)
         {
-            if (radius >= 14)
-                drawing.DrawEllipse(LightShadow, null, new Point(center.X + 4, center.Y + 8), radius * 1.15, radius * 1.14);
-
-            drawing.DrawEllipse(LightBody, null, center, radius, radius);
-            if (radius >= 17)
-            {
-                var refraction = new RadialGradientBrush
-                {
-                    Center = new Point(0.53, 0.88), GradientOrigin = new Point(0.71, 1.04), RadiusX = 0.64, RadiusY = 0.38,
-                };
-                refraction.GradientStops.Add(new GradientStop(Alpha(tone, 139), 0));
-                refraction.GradientStops.Add(new GradientStop(Alpha(tone, 48), 0.52));
-                refraction.GradientStops.Add(new GradientStop(Alpha(tone, 0), 1));
-                drawing.DrawEllipse(refraction, null, center, radius, radius);
-                drawing.DrawEllipse(LightRimFrost, null, center, radius, radius);
-                drawing.DrawEllipse(LightGlint, null, center, radius, radius);
-            }
-
-            var edge = new LinearGradientBrush { StartPoint = new Point(0.13, 0), EndPoint = new Point(0.85, 1) };
-            edge.GradientStops.Add(new GradientStop(Colors.White, 0));
-            edge.GradientStops.Add(new GradientStop(Color.FromArgb(190, 255, 254, 251), 0.28));
-            edge.GradientStops.Add(new GradientStop(Color.FromArgb(125, 145, 136, 119), 0.64));
-            edge.GradientStops.Add(new GradientStop(Color.FromArgb(177, 122, 132, 130), 1));
-            var rim = new Pen(edge, radius >= 50 ? 1.55 : 1.2);
-            drawing.DrawEllipse(null, rim, center, radius, radius);
-            if (radius >= 23)
-            {
-                double inner = radius - Math.Min(3.2, radius * 0.062);
-                DrawArc(drawing, center, inner, -156, -68, Colors.White, Color.FromArgb(13, 255, 255, 255), 2.15);
-                DrawArc(drawing, center, inner, 26, 116, Color.FromArgb(202, 255, 255, 251), Color.FromArgb(13, 255, 255, 251), 1.65);
-            }
-            GlassLight.Current.DrawReflection(drawing, center, radius);
+            var rim = new Pen(Linear(new Point(0.10, 0), new Point(0.83, 1), stops), 1.15);
+            rim.Freeze();
+            return rim;
         }
 
-        private static RadialGradientBrush FrostGradient(Point origin, double radiusX, double radiusY,
-            params (double Offset, byte Alpha, byte Red, byte Green, byte Blue)[] stops)
+        private static Brush Linear(Point from, Point to, params (double Offset, uint Argb)[] stops) =>
+            Paint(new LinearGradientBrush { StartPoint = from, EndPoint = to }, stops);
+
+        private static Brush Radial(Point center, double x, double y, params (double Offset, uint Argb)[] stops) =>
+            Paint(new RadialGradientBrush { Center = center, GradientOrigin = center, RadiusX = x, RadiusY = y }, stops);
+
+        private static Brush Paint(GradientBrush brush, (double Offset, uint Argb)[] stops)
         {
-            var brush = new RadialGradientBrush { GradientOrigin = origin, RadiusX = radiusX, RadiusY = radiusY };
-            foreach (var stop in stops)
-                brush.GradientStops.Add(new GradientStop(Color.FromArgb(stop.Alpha, stop.Red, stop.Green, stop.Blue), stop.Offset));
+            foreach (var (offset, color) in stops)
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(color >> 24), (byte)(color >> 16), (byte)(color >> 8), (byte)color), offset));
             brush.Freeze();
             return brush;
         }
-
-        private static void DrawArc(DrawingContext drawing, Point center, double radius, double fromAngle, double toAngle,
-            Color from, Color to, double stroke)
-        {
-            var arc = new StreamGeometry();
-            using (StreamGeometryContext geometry = arc.Open())
-            {
-                geometry.BeginFigure(AtAngle(center, radius, fromAngle), false, false);
-                geometry.ArcTo(AtAngle(center, radius, toAngle), new Size(radius, radius), 0, false, SweepDirection.Clockwise, true, false);
-            }
-            drawing.DrawGeometry(null, new Pen(new LinearGradientBrush(from, to, 25), stroke), arc);
-        }
-
-        private static Point AtAngle(Point center, double radius, double degrees)
-        {
-            double angle = degrees * Math.PI / 180;
-            return new Point(center.X + Math.Cos(angle) * radius, center.Y + Math.Sin(angle) * radius);
-        }
-
-        private static Color Tint(Color tone, double amount, byte alpha) => Color.FromArgb(alpha,
-            (byte)(6 + (tone.R - 6) * amount), (byte)(12 + (tone.G - 12) * amount), (byte)(23 + (tone.B - 23) * amount));
-
-        private static Color Alpha(Color color, byte alpha) => Color.FromArgb(alpha, color.R, color.G, color.B);
     }
 
     internal sealed class StorageIllustration : FrameworkElement
@@ -323,13 +227,11 @@ namespace DiskBubbles
             drawing.PushTransform(new TranslateTransform((ActualWidth - width * scale) / 2, (ActualHeight - height * scale) / 2));
             drawing.PushTransform(new ScaleTransform(scale, scale));
 
-            Color lens = Appearance.IsLight ? Color.FromRgb(181, 180, 185) : Color.FromRgb(159, 186, 201);
-            Color smallLens = Appearance.IsLight ? Color.FromRgb(175, 174, 177) : Color.FromRgb(162, 175, 191);
-            GlassOrb.Draw(drawing, center, 52, lens);
-            GlassOrb.Draw(drawing, center + new Vector(-73, -23), 19, smallLens);
-            GlassOrb.Draw(drawing, center + new Vector(73, -23), 19, smallLens);
-            GlassOrb.Draw(drawing, center + new Vector(-67, 26), 14, smallLens);
-            GlassOrb.Draw(drawing, center + new Vector(67, 26), 14, smallLens);
+            GlassOrb.Draw(drawing, center, 52);
+            GlassOrb.Draw(drawing, center + new Vector(-73, -23), 19);
+            GlassOrb.Draw(drawing, center + new Vector(73, -23), 19);
+            GlassOrb.Draw(drawing, center + new Vector(-67, 26), 14);
+            GlassOrb.Draw(drawing, center + new Vector(67, 26), 14);
             drawing.PushTransform(new TranslateTransform(center.X - 20, center.Y - 19.2));
             drawing.PushTransform(new ScaleTransform(1.6, 1.6));
             var ink = (Brush)FindResource("Ink");

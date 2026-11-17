@@ -4,7 +4,7 @@ Disk Bubbles shows where your Windows storage went. Scan a drive or folder and g
 
 [Download for Windows](https://github.com/tiwaritarush/disk-bubbles/releases) · [Build from source](#build-from-source) · [Report an issue](https://github.com/tiwaritarush/disk-bubbles/issues)
 
-![Disk Bubbles in dark mode. A list of folders sits beside a map of circles sized by storage use.](docs/screenshots/dark.png)
+![Disk Bubbles in dark mode. A frosted pane with a list of folders sits beside a map of circles sized by storage use.](docs/screenshots/dark.png)
 
 Windows can tell you that a drive is nearly full. Figuring out which project, download, or backup is responsible often means opening one folder after another. Disk Bubbles puts the sizes and hierarchy in the same view so you can go straight to the folders worth investigating.
 

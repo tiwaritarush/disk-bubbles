@@ -98,13 +98,9 @@ namespace DiskBubbles
         private static readonly Brush LightFolderFill = new LinearGradientBrush(Color.FromRgb(49, 47, 46), Color.FromRgb(5, 5, 5), 90);
         private static readonly Brush LightFileFill = new LinearGradientBrush(Color.FromRgb(65, 62, 59), Color.FromRgb(22, 21, 20), 90);
         private static readonly Brush LightIconTab = new SolidColorBrush(Color.FromRgb(76, 72, 69));
-        private static readonly Color FolderGlass = Color.FromRgb(159, 186, 201);
-        private static readonly Color FileGlass = Color.FromRgb(162, 175, 191);
-        private static readonly Color LightFolderGlass = Color.FromRgb(181, 180, 185);
-        private static readonly Color LightFileGlass = Color.FromRgb(175, 174, 177);
         private static readonly Brush PressShade = new SolidColorBrush(Color.FromArgb(58, 9, 10, 13));
-        private static readonly Brush DarkReflection = Glow(Color.FromArgb(70, 226, 238, 255), 0.5, 0.5);
-        private static readonly Brush LightReflection = Glow(Color.FromArgb(106, 255, 255, 255), 0.5, 0.5);
+        private static readonly Brush DarkReflection = Glow(Color.FromArgb(44, 226, 238, 255), 0.5, 0.5);
+        private static readonly Brush LightReflection = Glow(Color.FromArgb(74, 255, 255, 255), 0.5, 0.5);
 
         private readonly ConditionalWeakTable<DiskEntry, Layout> _cache = new ConditionalWeakTable<DiskEntry, Layout>();
         private DiskEntry _folder;
@@ -502,9 +498,7 @@ namespace DiskBubbles
 
         private void DrawBubble(DrawingContext drawing, Bubble bubble)
         {
-            Color tone = Appearance.IsLight ? (bubble.Entry.IsFolder ? LightFolderGlass : LightFileGlass)
-                : bubble.Entry.IsFolder ? FolderGlass : FileGlass;
-            GlassOrb.Draw(drawing, bubble.Center, bubble.Radius, tone);
+            GlassOrb.Draw(drawing, bubble.Center, bubble.Radius);
 
             if (bubble.Radius < 28)
             {

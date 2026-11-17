@@ -14,22 +14,30 @@
   <SolidColorBrush x:Key="Attention" Color="#793D29" />
   <LinearGradientBrush x:Key="GlassEdge" StartPoint="0,0" EndPoint="0.8,1">
     <GradientStop Offset="0" Color="#FFFDF8" />
-    <GradientStop Offset="0.45" Color="#DAD3C9" />
-    <GradientStop Offset="1" Color="#C0B7AD" />
+    <GradientStop Offset="0.28" Color="#F1EAE3" />
+    <GradientStop Offset="0.74" Color="#C6BDB4" />
+    <GradientStop Offset="1" Color="#D0C7BE" />
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="GlassInner" StartPoint="0.12,0" EndPoint="0.82,1">
+    <GradientStop Offset="0" Color="#9EFFFFFF" />
+    <GradientStop Offset="0.40" Color="#39FFFFFF" />
+    <GradientStop Offset="0.78" Color="#00FFFFFF" />
+    <GradientStop Offset="1" Color="#26FFFFFF" />
   </LinearGradientBrush>
   <LinearGradientBrush x:Key="Panel" StartPoint="0,0" EndPoint="0.72,1">
     <GradientStop Offset="0" Color="#FAF7F1" />
     <GradientStop Offset="1" Color="#F0EAE3" />
   </LinearGradientBrush>
-  <LinearGradientBrush x:Key="GlassPane" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Offset="0" Color="#AEFFFEFA" />
-    <GradientStop Offset="1" Color="#64FFFDFB" />
-  </LinearGradientBrush>
-  <LinearGradientBrush x:Key="GlassClear" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Offset="0" Color="#5CFFFEFA" />
-    <GradientStop Offset="0.63" Color="#13FFFDFB" />
-    <GradientStop Offset="1" Color="#44FFFDFB" />
-  </LinearGradientBrush>
+  <RadialGradientBrush x:Key="GlassPane" Center="0.16,0.04" GradientOrigin="0.16,0.04" RadiusX="1.12" RadiusY="1.15">
+    <GradientStop Offset="0" Color="#D6FFFEFC" />
+    <GradientStop Offset="0.54" Color="#A2F9F6F1" />
+    <GradientStop Offset="1" Color="#62F9F7F2" />
+  </RadialGradientBrush>
+  <RadialGradientBrush x:Key="GlassClear" Center="0.17,0.08" GradientOrigin="0.17,0.08" RadiusX="1.08" RadiusY="1.24">
+    <GradientStop Offset="0" Color="#9FFFFEFC" />
+    <GradientStop Offset="0.56" Color="#64F8F5F0" />
+    <GradientStop Offset="1" Color="#20F8F5F0" />
+  </RadialGradientBrush>
   <LinearGradientBrush x:Key="Raised" StartPoint="0,0" EndPoint="0,1">
     <GradientStop Offset="0" Color="#FFFCF7" />
     <GradientStop Offset="1" Color="#ECE6DC" />

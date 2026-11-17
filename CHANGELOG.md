@@ -1,5 +1,10 @@
 # Changelog
 
+## 10.3.5
+
+- Put the file list, storage map, and App Cleaner results and details in rounded glass panes.
+- Soften the bubble reflections and diffuse their color within the glass.
+
 ## 10.3.4
 
 - Keep pink and green reflections inside the glass bubbles and remove the ambient glow from the backgrounds.

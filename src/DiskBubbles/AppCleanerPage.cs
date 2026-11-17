@@ -116,6 +116,7 @@ namespace DiskBubbles
 
             var columns = new Grid();
             columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
             columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(242) });
             var table = new DockPanel { Margin = new Thickness(15, 14, 12, 10) };
             var toolbar = new DockPanel { Margin = new Thickness(0, 0, 8, 9) };
@@ -141,7 +142,7 @@ namespace DiskBubbles
             _list.SetValue(VirtualizingPanel.VirtualizationModeProperty, VirtualizationMode.Recycling);
             AutomationProperties.SetName(_list, "App Cleaner results");
             table.Children.Add(_list);
-            columns.Children.Add(table);
+            columns.Children.Add(UiVisuals.FrostedPane(table));
 
             var details = new StackPanel { Margin = new Thickness(17, 19, 16, 16) };
             _itemIcon.ContentTemplate = (DataTemplate)FindResource("AppGlyph");
@@ -159,18 +160,12 @@ namespace DiskBubbles
             _openFolder.Margin = new Thickness(0, 14, 0, 0);
             _openFolder.HorizontalAlignment = HorizontalAlignment.Left;
             details.Children.Add(_openFolder);
-            var side = new Border
-            {
-                BorderThickness = new Thickness(1, 0, 0, 0),
-                Child = new ScrollViewer { Content = details, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled },
-            };
-            side.SetResourceReference(Border.BorderBrushProperty, "Line");
-            SetColumn(side, 1);
+            var side = UiVisuals.FrostedPane(new ScrollViewer { Content = details, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled },
+                "GlassClear");
+            SetColumn(side, 2);
             columns.Children.Add(side);
-            var glass = UiVisuals.Surface(new Border { Child = columns, CornerRadius = new CornerRadius(15) }, "GlassPane");
-            var card = UiVisuals.Surface(new Border { Child = glass, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(15) }, "Chart", "GlassEdge");
-            SetRow(card, 1);
-            _results.Children.Add(card);
+            SetRow(columns, 1);
+            _results.Children.Add(columns);
 
             var footer = new DockPanel { Margin = new Thickness(3, 12, 3, 0) };
             UiVisuals.Emphasize(_review);

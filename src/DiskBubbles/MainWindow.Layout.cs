@@ -165,20 +165,14 @@ namespace DiskBubbles
 
             var panels = new Grid();
             panels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 278, MaxWidth = 384 });
+            panels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
             panels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2.32, GridUnitType.Star) });
-            var itemPanel = UiVisuals.Surface(new Border
-            {
-                BorderThickness = new Thickness(0, 0, 1, 0),
-                CornerRadius = new CornerRadius(15, 0, 0, 15), Child = BuildEntries(),
-            }, "GlassPane", "Line");
-            panels.Children.Add(itemPanel);
-            var storageMap = UiVisuals.Surface(new Border { Child = BuildMap(),
-                CornerRadius = new CornerRadius(0, 15, 15, 0) }, "GlassClear");
-            Grid.SetColumn(storageMap, 1);
+            panels.Children.Add(UiVisuals.FrostedPane(BuildEntries()));
+            var storageMap = UiVisuals.FrostedPane(BuildMap(), "GlassClear");
+            Grid.SetColumn(storageMap, 2);
             panels.Children.Add(storageMap);
-            var workspace = Card(panels, "Chart");
-            Grid.SetRow(workspace, 1);
-            _browser.Children.Add(workspace);
+            Grid.SetRow(panels, 1);
+            _browser.Children.Add(panels);
 
             var footer = new DockPanel { Margin = new Thickness(3, 14, 3, 1) };
             FormatLabel(_status, 12, "Muted");
@@ -400,12 +394,6 @@ namespace DiskBubbles
             label.FontWeight = weight ?? FontWeights.Normal;
             label.TextTrimming = TextTrimming.CharacterEllipsis;
         }
-
-        private Border Card(UIElement content, string fill) => UiVisuals.Surface(new Border
-        {
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(16), Child = content,
-        }, fill, "GlassEdge");
 
         private Canvas Mark(double size)
         {
