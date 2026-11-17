@@ -301,6 +301,60 @@
     </DataTemplate.Triggers>
   </DataTemplate>
 
+  <Style x:Key="FilterInput" TargetType="TextBox">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TextBox">
+          <Border x:Name="InputFrame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  CornerRadius="9" BorderThickness="1" Padding="2,0">
+            <ScrollViewer x:Name="PART_ContentHost" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+              <Setter TargetName="InputFrame" Property="BorderBrush" Value="{DynamicResource Accent}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="InputFrame" Property="Opacity" Value="0.5" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <DataTemplate x:Key="AppRow">
+    <Grid Margin="0,0,7,0" ToolTip="{Binding Location}">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="28" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="91" />
+      </Grid.ColumnDefinitions>
+      <CheckBox x:Name="MarkApp" Style="{StaticResource EntryMark}" IsChecked="{Binding Marked, Mode=TwoWay}"
+                IsEnabled="{Binding CanMark}" VerticalAlignment="Center" automation:AutomationProperties.Name="{Binding Name, StringFormat='Mark {0} for uninstall review'}" />
+      <StackPanel Grid.Column="1">
+        <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ink}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{Binding Kind}" Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,2,0,0" />
+      </StackPanel>
+      <TextBlock Grid.Column="2" Text="{Binding SizeLabel}" Foreground="{DynamicResource Muted}" FontSize="12"
+                 TextAlignment="Right" VerticalAlignment="Center" Margin="3,0,8,0" />
+    </Grid>
+  </DataTemplate>
+
+  <DataTemplate x:Key="AppLeftover">
+    <Grid Margin="4,0,7,0" ToolTip="{Binding Location}">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="91" />
+      </Grid.ColumnDefinitions>
+      <StackPanel>
+        <TextBlock Text="{Binding Name}" Foreground="{DynamicResource Ink}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{Binding Location}" Foreground="{DynamicResource Muted}" FontSize="12" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+      <TextBlock Grid.Column="1" Text="{Binding SizeLabel}" Foreground="{DynamicResource Muted}" FontSize="12"
+                 TextAlignment="Right" VerticalAlignment="Center" Margin="3,0,8,0" />
+    </Grid>
+  </DataTemplate>
+
   <DataTemplate x:Key="RecycleEntry">
     <Grid Margin="0,2" ToolTip="{Binding Path}">
       <Grid.ColumnDefinitions>

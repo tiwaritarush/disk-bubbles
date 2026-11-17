@@ -21,6 +21,30 @@ namespace DiskBubbles
         public const string Sun = "M 12,8 A 4,4 0 1 1 11.99,8 M 12,2 V 4 M 12,20 V 22 M 2,12 H 4 M 20,12 H 22 M 5,5 L 6.5,6.5 M 17.5,17.5 L 19,19 M 5,19 L 6.5,17.5 M 17.5,6.5 L 19,5";
         public const string Moon = "M 19.5,15 A 8,8 0 1 1 9,4.5 A 6.5,6.5 0 0 0 19.5,15 Z";
 
+        private static Brush _darkBlush;
+        private static Brush _lightBlush;
+
+        public static void DrawBlush(DrawingContext drawing, Rect bounds)
+        {
+            if (SystemParameters.HighContrast || bounds.Width <= 0 || bounds.Height <= 0)
+                return;
+
+            Brush blush = Appearance.IsLight ? (_lightBlush ??= BlushBrush(38)) : (_darkBlush ??= BlushBrush(49));
+            drawing.DrawEllipse(blush, null, new Point(bounds.X + bounds.Width * 0.54, bounds.Y + bounds.Height * 0.53),
+                bounds.Width * 0.46, bounds.Height * 0.47);
+        }
+
+        private static Brush BlushBrush(byte strength)
+        {
+            Color tint = ((SolidColorBrush)Application.Current.FindResource("Atmosphere")).Color;
+            var brush = new RadialGradientBrush { RadiusX = 0.5, RadiusY = 0.5, GradientOrigin = new Point(0.60, 0.51) };
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(strength, tint.R, tint.G, tint.B), 0));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(strength / 2), tint.R, tint.G, tint.B), 0.46));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, tint.R, tint.G, tint.B), 1));
+            brush.Freeze();
+            return brush;
+        }
+
         public static FrameworkElement Icon(string geometry, string color, double size = 16)
         {
             var icon = new Path
@@ -291,8 +315,7 @@ namespace DiskBubbles
 
     internal sealed class StorageIllustration : FrameworkElement
     {
-        private static readonly Color Silver = Color.FromRgb(188, 191, 203);
-        private static readonly Color Smoke = Color.FromRgb(162, 167, 181);
+        private static readonly Geometry FolderGlyph = Geometry.Parse(UiVisuals.Folder);
 
         protected override void OnRender(DrawingContext drawing)
         {
@@ -303,24 +326,20 @@ namespace DiskBubbles
             drawing.PushTransform(new TranslateTransform((ActualWidth - 440 * scale) / 2, (ActualHeight - 376 * scale) / 2));
             drawing.PushTransform(new ScaleTransform(scale, scale));
 
-            Point center = new Point(220, 185);
-            drawing.PushTransform(new RotateTransform(-28, center.X, center.Y));
-            Color orbitColor = Appearance.IsLight ? Color.FromArgb(97, 112, 100, 89) : Color.FromArgb(79, 202, 204, 217);
-            var orbit = new Pen(new LinearGradientBrush(Colors.Transparent, orbitColor, 30), 1.05);
-            drawing.DrawEllipse(null, orbit, center, 181, 80);
-            drawing.Pop();
-            Color lens = Appearance.IsLight ? Color.FromRgb(189, 174, 174) : Silver;
-            Color smallLens = Appearance.IsLight ? Color.FromRgb(184, 176, 165) : Smoke;
-            GlassOrb.Draw(drawing, center, 119, lens);
-            GlassOrb.Draw(drawing, new Point(346, 95), 44, smallLens);
-            GlassOrb.Draw(drawing, new Point(91, 244), 42, lens);
-
-            drawing.PushTransform(new TranslateTransform(185, 162));
-            drawing.PushTransform(new ScaleTransform(3.12, 3.12));
-            Color diskIcon = Appearance.IsLight ? Color.FromRgb(47, 39, 33) : Color.FromArgb(223, 232, 238, 242);
-            drawing.DrawGeometry(null,
-                new Pen(new SolidColorBrush(diskIcon), 0.76) { LineJoin = PenLineJoin.Round },
-                Geometry.Parse(UiVisuals.Drive));
+            UiVisuals.DrawBlush(drawing, new Rect(6, 9, 426, 354));
+            Color lens = Appearance.IsLight ? Color.FromRgb(189, 174, 174) : Color.FromRgb(159, 186, 201);
+            Color smallLens = Appearance.IsLight ? Color.FromRgb(184, 176, 165) : Color.FromRgb(162, 175, 191);
+            GlassOrb.Draw(drawing, new Point(221, 189), 91, lens);
+            GlassOrb.Draw(drawing, new Point(104, 111), 42, smallLens);
+            GlassOrb.Draw(drawing, new Point(349, 148), 36, lens);
+            GlassOrb.Draw(drawing, new Point(316, 284), 34, smallLens);
+            GlassOrb.Draw(drawing, new Point(113, 260), 31, lens);
+            GlassOrb.Draw(drawing, new Point(205, 79), 16, smallLens);
+            GlassOrb.Draw(drawing, new Point(219, 307), 18, smallLens);
+            drawing.PushTransform(new TranslateTransform(194, 162));
+            drawing.PushTransform(new ScaleTransform(2.25, 2.25));
+            var ink = (Brush)FindResource("Ink");
+            drawing.DrawGeometry(null, new Pen(ink, 0.75) { LineJoin = PenLineJoin.Round }, FolderGlyph);
             drawing.Pop();
             drawing.Pop();
             drawing.Pop();

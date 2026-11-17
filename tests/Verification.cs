@@ -458,6 +458,7 @@ internal static class Verification
                     "An entry changed after review but was still moved.");
                 Assert(File.Exists(Path.Combine(fixture, "System data.bin")), "A system item was moved.");
                 var visuals = assembly.GetType("DiskBubbles.UiVisuals");
+                await VerifyAppCleaner(window, assembly, fixture, expected);
                 var notice = (Window)visuals.GetMethod("Notice").Invoke(null, new object[] { window, "Can’t open this location",
                     "Windows couldn’t read this location. Choose another folder or drive." });
                 notice.WindowStartupLocation = WindowStartupLocation.Manual;
@@ -468,7 +469,7 @@ internal static class Verification
                 await Task.Delay(260);
                 await Capture(notice, Path.Combine(fixture, "../notice.png"));
                 notice.Close();
-                Console.WriteLine($"Verified {files.Count} files and {expected} bytes, both themes, folder clicks, map pagination, persistent marks, multi-folder review, cancellation, and Recycle Bin safeguards.");
+                Console.WriteLine($"Verified {files.Count} files and {expected} bytes, map navigation, Recycle Bin safeguards, both themes, App Cleaner switching, app sizing, and uninstall review.");
                 application.Shutdown(0);
             }
             catch (Exception error)
@@ -483,6 +484,90 @@ internal static class Verification
 
     private static object WindowField(Window window, string name) =>
         window.GetType().GetField(name, PrivateInstance).GetValue(window);
+
+    private static async Task VerifyAppCleaner(Window window, Assembly assembly, string fixture, long expected)
+    {
+        var inventory = assembly.GetType("DiskBubbles.AppInventory");
+        var measurement = inventory.GetMethod("Measure", BindingFlags.Static | BindingFlags.NonPublic)
+            .Invoke(null, new object[] { fixture, CancellationToken.None });
+        Assert((long)measurement.GetType().GetField("Item1").GetValue(measurement) == expected,
+            "The app folder size did not match its files on disk.");
+        var normalize = inventory.GetMethod("Normalize", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert(normalize.Invoke(null, new object[] { Path.GetPathRoot(fixture) }) == null &&
+            normalize.Invoke(null, new object[] { Path.Combine(fixture, "..", "Other") }) == null,
+            "A drive root or traversal path passed the app path boundary.");
+
+        var page = (FrameworkElement)WindowField(window, "_appCleaner");
+        var entryType = assembly.GetType("DiskBubbles.InstalledApp");
+        var apps = (IList)page.GetType().GetField("_apps", PrivateInstance).GetValue(page);
+        object Add(string name, string publisher, long? bytes, string kind = null)
+        {
+            var item = Activator.CreateInstance(entryType);
+            entryType.GetProperty("Name").SetValue(item, name);
+            entryType.GetProperty("Publisher").SetValue(item, publisher);
+            entryType.GetProperty("Version").SetValue(item, "4.2.1");
+            entryType.GetProperty("Bytes").SetValue(item, bytes);
+            entryType.GetProperty("Package").SetValue(item, kind);
+            entryType.GetProperty("Location").SetValue(item, @"D:\Apps\" + name);
+            apps.Add(item);
+            return item;
+        }
+
+        var studio = Add("Frame Studio", "Northlight Labs", 4880000000L);
+        Add("Station Audio", "Station", 1670000000L);
+        Add("Canvas Notes", null, 640000000L, "Example.Notes_4.2.1.0_x64__fixture");
+        Add("Archive Tool", "Archive Labs", 152000000L);
+        Add("Image Utility", "Field Tools", null);
+        entryType.GetField("WindowsInstaller", PrivateInstance).SetValue(studio, true);
+        entryType.GetField("Key", PrivateInstance).SetValue(studio, "{40F8C74A-E077-47BD-90AC-DC90F04304CD}");
+        entryType.GetField("Command", PrivateInstance).SetValue(studio, "MsiExec.exe /I{40F8C74A-E077-47BD-90AC-DC90F04304CD}");
+        var launcher = assembly.GetType("DiskBubbles.AppRemoval").GetMethod("DesktopLauncher", BindingFlags.Static | BindingFlags.NonPublic);
+        var process = (System.Diagnostics.ProcessStartInfo)launcher.Invoke(null, new[] { studio });
+        Assert(process != null && process.FileName == Path.Combine(Environment.SystemDirectory, "msiexec.exe") &&
+            process.Arguments == "/x {40f8c74a-e077-47bd-90ac-dc90f04304cd} /norestart", "The MSI registration did not produce an explicit uninstall.");
+        entryType.GetField("Command", PrivateInstance).SetValue(studio, @"C:\Windows\System32\cmd.exe /c echo forbidden");
+        Assert(launcher.Invoke(null, new[] { studio }) == null, "A shell command passed the uninstaller boundary.");
+        entryType.GetField("Command", PrivateInstance).SetValue(studio, "MsiExec.exe /I{40F8C74A-E077-47BD-90AC-DC90F04304CD}");
+        page.GetType().GetField("_loaded", PrivateInstance).SetValue(page, true);
+        ((TextBlock)page.GetType().GetField("_status", PrivateInstance).GetValue(page)).Text = "5 installed apps · largest measured first";
+        page.GetType().GetMethod("UpdateList", PrivateInstance).Invoke(page, null);
+        var disk = (Button)WindowField(window, "_diskMode");
+        var cleaner = (Button)WindowField(window, "_appsMode");
+        cleaner.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(page.IsVisible && !((FrameworkElement)WindowField(window, "_browser")).IsVisible, "App Cleaner did not open as a separate mode.");
+        var list = (ListBox)page.GetType().GetField("_list", PrivateInstance).GetValue(page);
+        var search = (TextBox)page.GetType().GetField("_search", PrivateInstance).GetValue(page);
+        search.Text = "Northlight";
+        Assert(list.Items.Count == 1 && ReferenceEquals(list.Items[0], studio), "The app filter missed its publisher.");
+        search.Clear();
+        list.SelectedItem = studio;
+        window.Width = Math.Max(window.MinWidth, Math.Min(1280, SystemParameters.WorkArea.Width));
+        window.Height = Math.Max(window.MinHeight, Math.Min(870, SystemParameters.WorkArea.Height));
+        var light = window.GetType().GetMethod("ChangeAppearance", PrivateInstance);
+        await Capture(window, Path.Combine(fixture, "../app-cleaner-light.png"));
+        light.Invoke(window, new object[] { false });
+        await Capture(window, Path.Combine(fixture, "../app-cleaner-dark.png"));
+
+        var review = (Button)page.GetType().GetField("_review", PrivateInstance).GetValue(page);
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(25) };
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        timer.Tick += (sender, args) =>
+        {
+            Window modal = Application.Current.Windows.Cast<Window>().FirstOrDefault(item => item.Owner == window && item.IsVisible && item.Title == "Review uninstall");
+            if (modal == null && DateTime.UtcNow < deadline) return;
+            timer.Stop();
+            modal?.Close();
+            completion.SetResult(modal != null);
+        };
+        timer.Start();
+        review.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(await completion.Task, "The uninstall review did not open for a selected app.");
+        disk.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(!page.IsVisible && ((FrameworkElement)WindowField(window, "_browser")).IsVisible &&
+            ((TextBlock)WindowField(window, "_path")).Text == Path.Combine(fixture, "Empty"), "Switching modes discarded the disk scan.");
+        light.Invoke(window, new object[] { true });
+    }
 
     private static string EntryName(object item) => (string)item.GetType().GetProperty("Name").GetValue(item);
 

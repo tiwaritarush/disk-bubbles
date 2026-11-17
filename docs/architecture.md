@@ -1,5 +1,11 @@
 # Architecture
 
+## App Cleaner
+
+App Cleaner reads desktop app registrations and the current user’s Store catalog. It measures readable install folders with the same Windows directory reader that Disk Scan uses. Sizes reflect the files Windows returned, and a partial measurement is shown as a lower bound. Uninstall review names each action before opening its registered desktop uninstaller, removing a Store package, or handing off to Windows Settings.
+
+After a desktop uninstall, the current session can identify its remaining install folder. Disk Bubbles checks for other registrations that use the folder before allowing it through the existing Recycle Bin review.
+
 `src/DiskBubbles` contains the native Windows app. `tests/Verification.cs` drives it with disposable fixtures. `Build.ps1` invokes the .NET SDK compiler and embeds the XAML, manifest, and icon into one executable.
 
 ## From drive to map

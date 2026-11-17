@@ -1,5 +1,11 @@
 # Changelog
 
+## 10.3.0
+
+- Open App Cleaner separately from Disk Scan. Compare measured install folders, filter apps, and review uninstall actions.
+- Inspect folders left after uninstall. Folder moves use the same Recycle Bin review as Disk Scan, with a fresh check that no installed app claims the folder.
+- Increase text and control sizes, preview the storage map on the start page, and spread the green and pink blushes behind the glass.
+
 ## 10.2.0
 
 - Refresh the light theme with cream and ink and add a soft orchid reflection to the map. The dark theme uses midnight and ice white with a green aurora behind the bubbles.

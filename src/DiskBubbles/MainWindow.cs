@@ -28,6 +28,9 @@ namespace DiskBubbles
 
         private readonly Grid _surface = new Grid();
         private readonly Grid _browser = new Grid();
+        private readonly AppCleanerPage _appCleaner;
+        private readonly Button _diskMode = new Button { Content = "Disk Scan" };
+        private readonly Button _appsMode = new Button { Content = "App Cleaner" };
         private readonly ListBox _entries = new ListBox();
         private readonly BubbleMap _map = new BubbleMap();
         private readonly StackPanel _crumbs = new StackPanel { Orientation = Orientation.Horizontal };
@@ -80,10 +83,10 @@ namespace DiskBubbles
         public MainWindow()
         {
             Title = "Disk Bubbles";
-            Width = 1200;
-            Height = 800;
-            MinWidth = 760;
-            MinHeight = 530;
+            Width = Math.Min(1280, SystemParameters.WorkArea.Width);
+            Height = Math.Min(870, SystemParameters.WorkArea.Height);
+            MinWidth = 800;
+            MinHeight = 586;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             SetResourceReference(Control.BackgroundProperty, "Base");
             SetResourceReference(Control.ForegroundProperty, "Ink");
@@ -93,20 +96,32 @@ namespace DiskBubbles
             TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
             UiVisuals.ThemeCaption(this);
 
-            var shell = new DockPanel();
+            _appCleaner = new AppCleanerPage(this, OpenExplorer, () =>
+            {
+                if (_result == null) return;
+                _result.NeedsRefresh = true;
+                UpdateScanStatus();
+            }, busy => _diskMode.IsEnabled = !busy);
+            var shell = new DockPanel { LayoutTransform = new ScaleTransform(1.06, 1.06) };
             shell.SetResourceReference(Panel.BackgroundProperty, "Workspace");
             var header = BuildHeader();
             DockPanel.SetDock(header, Dock.Top);
             shell.Children.Add(header);
+            var modes = BuildModeBar();
+            DockPanel.SetDock(modes, Dock.Top);
+            shell.Children.Add(modes);
             _surface.Margin = new Thickness(24, 20, 24, 15);
             shell.Children.Add(_surface);
-            Content = shell;
+            var viewport = new Grid();
+            viewport.Children.Add(shell);
+            Content = viewport;
             BuildBrowser();
             BuildLanding();
             BuildScanning();
             _surface.Children.Add(_browser);
             _surface.Children.Add(_landing);
             _surface.Children.Add(_scanning);
+            _surface.Children.Add(_appCleaner);
             ShowPage(_landing);
 
             _folder.Click += async (sender, args) => await ChooseFolderAsync();
@@ -189,7 +204,7 @@ namespace DiskBubbles
                 _scan?.Cancel();
                 _recycleCheck?.Cancel();
             };
-            Closing += (sender, args) => args.Cancel = _movingToBin;
+            Closing += (sender, args) => args.Cancel = _movingToBin || _appCleaner.MovingFiles;
             PreviewKeyDown += (sender, args) =>
             {
                 if (args.Key == Key.Escape && _recycleCheck != null)
@@ -302,9 +317,11 @@ namespace DiskBubbles
                 {
                     _spinner.IsIndeterminate = false;
                     _folder.IsEnabled = _drive.IsEnabled = true;
-                    ShowPage(_result == null ? _landing : _browser);
-                    if (completed)
-                        _map.Reveal();
+                    if (_appCleaner.Visibility != Visibility.Visible)
+                    {
+                        ShowPage(_result == null ? _landing : _browser);
+                        if (completed) _map.Reveal();
+                    }
                 }
             }
         }
@@ -558,7 +575,10 @@ namespace DiskBubbles
             foreach (UIElement child in _surface.Children)
                 child.Visibility = child == page ? Visibility.Visible : Visibility.Collapsed;
             _folder.Visibility = page == _browser ? Visibility.Visible : Visibility.Collapsed;
-            _drive.Visibility = page == _scanning ? Visibility.Collapsed : Visibility.Visible;
+            bool apps = page == _appCleaner;
+            _drive.Visibility = page == _scanning || apps ? Visibility.Collapsed : Visibility.Visible;
+            SetActiveMode(_diskMode, !apps);
+            SetActiveMode(_appsMode, apps);
         }
 
         private static string Counts(long files, long folders, long skipped) =>

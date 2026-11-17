@@ -63,6 +63,34 @@ namespace DiskBubbles
                 illustration.InvalidateVisual();
         }
 
+        private Border BuildModeBar()
+        {
+            var modes = new StackPanel { Orientation = Orientation.Horizontal };
+            foreach (Button button in new[] { _diskMode, _appsMode })
+            {
+                button.Style = (Style)FindResource("QuietButton");
+                button.MinWidth = 106;
+                button.Margin = new Thickness(0, 0, 6, 0);
+                modes.Children.Add(button);
+            }
+            _diskMode.Click += (sender, args) => ShowPage(_scan != null ? _scanning : _result == null ? _landing : _browser);
+            _appsMode.Click += async (sender, args) =>
+            {
+                ShowPage(_appCleaner);
+                await _appCleaner.OpenAsync();
+            };
+            return UiVisuals.Surface(new Border { Child = modes, Padding = new Thickness(24, 8, 24, 8),
+                BorderThickness = new Thickness(0, 0, 0, 1) }, "Workspace", "Line");
+        }
+
+        private static void SetActiveMode(Button button, bool selected)
+        {
+            button.SetResourceReference(Control.BackgroundProperty, selected ? "Raised" : "Workspace");
+            button.SetResourceReference(Control.BorderBrushProperty, selected ? "Accent" : "Workspace");
+            button.SetResourceReference(Control.ForegroundProperty, selected ? "Ink" : "Muted");
+            AutomationProperties.SetItemStatus(button, selected ? "Current mode" : "");
+        }
+
         private void UpdateAppearanceButton()
         {
             string action = Appearance.IsLight ? "Switch to dark mode" : "Switch to light mode";
@@ -265,7 +293,7 @@ namespace DiskBubbles
         private void BuildLanding()
         {
             var body = new StackPanel();
-            var heading = Label("See what’s taking\nup space.", 48, "Ink", FontWeights.SemiBold);
+            var heading = Label("See where your\nspace went.", 47, "Ink", FontWeights.SemiBold);
             heading.TextTrimming = TextTrimming.None;
             heading.TextWrapping = TextWrapping.Wrap;
             heading.LineHeight = 53;
@@ -273,8 +301,7 @@ namespace DiskBubbles
             SizeChanged += (sender, args) =>
             {
                 bool compact = ActualWidth < 900;
-                heading.Text = compact ? "What’s taking\nup space?" : "See what’s taking\nup space.";
-                heading.FontSize = compact ? 37 : 48;
+                heading.FontSize = compact ? 36 : 47;
                 heading.LineHeight = compact ? 43 : 53;
             };
             body.Children.Add(heading);

@@ -8,7 +8,6 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Media.Imaging;
 
 namespace DiskBubbles
 {
@@ -124,8 +123,6 @@ namespace DiskBubbles
         private readonly DrawingGroup _pointerLight = new DrawingGroup();
         private readonly DrawingGroup _highlight = new DrawingGroup();
         private readonly TranslateTransform _reflectionPosition = new TranslateTransform();
-        private BitmapSource _aurora;
-        private Brush _blush;
         private EventHandler _startOnFrame;
         private int _transitionId;
         private bool _transitioning;
@@ -460,32 +457,15 @@ namespace DiskBubbles
         {
             var bounds = new Rect(RenderSize);
             drawing.DrawRectangle(Brushes.Transparent, null, bounds);
-            if (bounds.Width <= 0 || bounds.Height <= 0 || SystemParameters.HighContrast)
-                return;
-
             if (Appearance.IsLight)
-            {
                 drawing.DrawRectangle(LightWash, null, bounds);
-                if (_blush == null)
-                {
-                    Color pink = ((SolidColorBrush)FindResource("Atmosphere")).Color;
-                    _blush = Glow(Color.FromArgb(25, pink.R, pink.G, pink.B), 0.59, 0.49, new Point(0.67, 0.57));
-                }
-                drawing.DrawRectangle(_blush, null, bounds);
-            }
-            else
-            {
-                _aurora ??= AuroraBackdrop.Create(((SolidColorBrush)FindResource("Atmosphere")).Color);
-                drawing.DrawImage(_aurora, bounds);
-            }
+            UiVisuals.DrawBlush(drawing, bounds);
         }
 
-        private static Brush Glow(Color color, double radiusX, double radiusY, Point? origin = null)
+        private static Brush Glow(Color color, double radiusX, double radiusY)
         {
             var brush = new RadialGradientBrush(color, Color.FromArgb(0, color.R, color.G, color.B))
                 { RadiusX = radiusX, RadiusY = radiusY };
-            if (origin.HasValue)
-                brush.Center = brush.GradientOrigin = origin.Value;
             brush.Freeze();
             return brush;
         }

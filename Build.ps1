@@ -13,7 +13,7 @@ $references = @(
     'mscorlib.dll', 'System.dll', 'System.Core.dll', 'System.Xml.dll', 'System.Xaml.dll', 'System.Windows.Forms.dll',
     'WPF/WindowsBase.dll', 'WPF/PresentationCore.dll', 'WPF/PresentationFramework.dll'
 ) | ForEach-Object { '/reference:' + (Join-Path $framework $_) }
-$sources = @('App.cs', 'Appearance.cs', 'AuroraBackdrop.cs', 'UiMotion.cs', 'MainWindow.cs', 'MainWindow.Layout.cs', 'MainWindow.Recycle.cs', 'DiskScanner.cs',
+$sources = @('App.cs', 'Appearance.cs', 'AppInventory.cs', 'AppRemoval.cs', 'AppCleanerPage.cs', 'UiMotion.cs', 'MainWindow.cs', 'MainWindow.Layout.cs', 'MainWindow.Recycle.cs', 'DiskScanner.cs',
     'NativeDirectoryReader.cs', 'BubbleMap.cs', 'SystemProtection.cs', 'ShellRecycle.cs', 'RecycleItem.cs',
     'RecycleReview.cs', 'UiVisuals.cs') |
     ForEach-Object { Join-Path $sourceRoot $_ }

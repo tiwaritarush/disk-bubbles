@@ -124,6 +124,7 @@ namespace DiskBubbles
         private void SetRecycleBusy(bool busy)
         {
             _recycleBusy = busy;
+            _appsMode.IsEnabled = !busy;
             _browser.IsEnabled = _folder.IsEnabled = _drive.IsEnabled = !busy;
         }
 
