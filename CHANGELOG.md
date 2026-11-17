@@ -1,5 +1,13 @@
 # Changelog
 
+## 10.1.0
+
+- Open folders with one click in the list or on the map. The zoom follows the bubble, with shorter transitions and a reflection that follows the pointer.
+- Mark files and folders across the current scan, then review them together from the trash icon in the footer. Parent folders cover their marked descendants in review.
+- Page through every item on the map, including small and zero-byte entries. Going back restores the last map page and list scroll position.
+
+The disposable fixture verifies the review list and simulates a confirmed move across folders. Windows denied the live Shell transfer in the test environment and the disposable file remained in place.
+
 ## 10.0.1
 
 First GitHub preview. Includes the portable Windows executable, published source, screenshots, and a reproducible build and verification workflow. The recycle guard also checks that the resolved filename retains the exact spelling and casing selected in the app.
