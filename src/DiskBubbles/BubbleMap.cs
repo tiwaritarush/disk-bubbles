@@ -349,11 +349,11 @@ namespace DiskBubbles
         internal static List<Bubble> Pack(IReadOnlyList<DiskEntry> entries, double width, double height)
         {
             var bubbles = new List<Bubble>();
-            double margin = Math.Max(16, Math.Min(38, Math.Min(width, height) * 0.085));
+            double margin = Math.Max(14, Math.Min(32, Math.Min(width, height) * 0.06));
             if (entries.Count == 0 || width <= margin * 2 || height <= margin * 2)
                 return bubbles;
 
-            double aspect = Math.Max(0.68, Math.Min(1.28, (width - 2 * margin) / (height - 2 * margin)));
+            double aspect = Math.Max(0.68, Math.Min(1.45, (width - 2 * margin) / (height - 2 * margin)));
             double largest = Math.Max(1, entries[0].Bytes);
             Rect bounds = Rect.Empty;
 
@@ -507,7 +507,7 @@ namespace DiskBubbles
                 return;
             }
 
-            double nameSize = Math.Min(24, Math.Max(11, bubble.Radius * 0.157));
+            double nameSize = Math.Min(26, Math.Max(12, bubble.Radius * 0.171));
             bool showGlyph = bubble.Radius >= 39;
             bool system = bubble.Entry.IsSystem && bubble.Radius >= 49;
             double lift = system ? 7 : 0;
@@ -515,7 +515,7 @@ namespace DiskBubbles
             if (showGlyph)
                 DrawGlyph(drawing, bubble, lift: lift);
             DrawLabel(drawing, bubble, bubble.Entry.Name, _nameFont, nameSize, NameInk, baseline);
-            double size = Math.Min(16, Math.Max(10, nameSize * 0.77));
+            double size = Math.Min(18, Math.Max(11, nameSize * 0.77));
             double sizeOffset = baseline + nameSize * 1.19;
             DrawLabel(drawing, bubble, bubble.Entry.SizeLabel, _sizeFont, size, SizeInk, sizeOffset);
             if (system)

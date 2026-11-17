@@ -32,14 +32,14 @@ namespace DiskBubbles
         private readonly Button _leftoverMode = new Button { Content = "Leftovers" };
         private readonly Button _review = new Button();
         private readonly Button _openFolder = new Button { Content = "Open folder…" };
-        private readonly TextBlock _status = Label("", 13, "Muted");
-        private readonly TextBlock _summary = Label("", 13, "Ink", true);
+        private readonly TextBlock _status = Label("", 14, "Muted");
+        private readonly TextBlock _summary = Label("", 14, "Ink", true);
         private readonly ContentControl _itemIcon = new ContentControl { Width = 52, Height = 52, HorizontalAlignment = HorizontalAlignment.Left,
             Margin = new Thickness(0, 0, 0, 12), Focusable = false, IsHitTestVisible = false };
-        private readonly TextBlock _itemName = Label("", 23, "Ink", true);
-        private readonly TextBlock _itemInfo = Label("", 14, "Muted");
-        private readonly TextBlock _itemSize = Label("", 25, "Ink", true);
-        private readonly TextBlock _itemPath = Label("", 12, "Muted");
+        private readonly TextBlock _itemName = Label("", 24, "Ink", true);
+        private readonly TextBlock _itemInfo = Label("", 15, "Muted");
+        private readonly TextBlock _itemSize = Label("", 27, "Ink", true);
+        private readonly TextBlock _itemPath = Label("", 13, "Muted");
         private readonly List<InstalledApp> _receipts = new List<InstalledApp>();
         private readonly List<AppLeftover> _leftovers = new List<AppLeftover>();
         private List<InstalledApp> _apps = new List<InstalledApp>();
@@ -120,12 +120,13 @@ namespace DiskBubbles
             columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(242) });
             var table = new DockPanel { Margin = new Thickness(15, 14, 12, 10) };
             var toolbar = new DockPanel { Margin = new Thickness(0, 0, 8, 9) };
-            var filter = Label("Filter by name", 13, "Muted");
+            var filter = Label("Filter by name", 14, "Muted");
             filter.VerticalAlignment = VerticalAlignment.Center;
             filter.Margin = new Thickness(0, 0, 12, 0);
             DockPanel.SetDock(filter, Dock.Left);
             toolbar.Children.Add(filter);
-            _search.Height = 34;
+            _search.Height = 36;
+            _search.FontSize = 15;
             _search.Padding = new Thickness(8, 0, 8, 0);
             _search.Style = (Style)FindResource("FilterInput");
             _search.SetResourceReference(Control.BackgroundProperty, "Raised");

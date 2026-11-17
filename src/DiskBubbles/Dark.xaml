@@ -43,10 +43,6 @@
     <GradientStop Offset="0" Color="#172334" />
     <GradientStop Offset="1" Color="#101B2B" />
   </LinearGradientBrush>
-  <LinearGradientBrush x:Key="Header" StartPoint="0,0" EndPoint="1,1">
-    <GradientStop Offset="0" Color="#0C1320" />
-    <GradientStop Offset="1" Color="#080E1C" />
-  </LinearGradientBrush>
   <LinearGradientBrush x:Key="Workspace" StartPoint="0,0" EndPoint="0.93,1">
     <GradientStop Offset="0" Color="#080E1B" />
     <GradientStop Offset="1" Color="#000412" />

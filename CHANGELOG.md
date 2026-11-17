@@ -1,5 +1,11 @@
 # Changelog
 
+## 10.3.6
+
+- Give the top toolbar the same frosted glass as the results panes, and make file names, sizes, and breadcrumb labels easier to read.
+- Widen the file pane and use more of the storage map for bubbles while keeping room for every map page.
+- Keep the whole checkbox area separate from folder navigation so marking or unmarking stays in the same folder.
+
 ## 10.3.5
 
 - Put the file list, storage map, and App Cleaner results and details in rounded glass panes.

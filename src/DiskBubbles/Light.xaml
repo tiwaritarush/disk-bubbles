@@ -42,10 +42,6 @@
     <GradientStop Offset="0" Color="#FFFCF7" />
     <GradientStop Offset="1" Color="#ECE6DC" />
   </LinearGradientBrush>
-  <LinearGradientBrush x:Key="Header" StartPoint="0,0" EndPoint="1,1">
-    <GradientStop Offset="0" Color="#F6F1E9" />
-    <GradientStop Offset="1" Color="#ECE6DC" />
-  </LinearGradientBrush>
 
   <SolidColorBrush x:Key="TooltipFill" Color="#FCF8F2" />
   <SolidColorBrush x:Key="TooltipEdge" Color="#A69D94" />

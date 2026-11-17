@@ -334,14 +334,29 @@ internal static class Verification
                 Assert(path.Text == fixture, "Forward failed to restore the next location.");
 
                 var activate = windowType.GetMethod("Activate", PrivateInstance);
+                ((Button)WindowField(window, "_clearMarks")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 object projects = entries.Items[0];
                 var projectBox = await FindMark(entries, projects);
                 var projectRow = (ListBoxItem)entries.ItemContainerGenerator.ContainerFromItem(projects);
-                Click(projectBox);
-                Assert(path.Text == fixture, "Clicking the checkbox opened its folder.");
+                Click(FindVisual<Grid>(projectRow, area => area.Name == "MarkArea"));
+                Assert(path.Text == fixture, "Clicking the edge of the checkbox area opened its folder.");
+                Click(FindVisual<Border>(projectBox, square => square.Name == "Box"));
+                ToggleMark(projectBox);
+                Assert(path.Text == fixture && projectBox.IsChecked == true && reviewButton.IsEnabled,
+                    "Clicking a folder's checkbox did not mark it in place.");
+                ToggleMark(projectBox);
+                Assert(path.Text == fixture && projectBox.IsChecked == false && !reviewButton.IsEnabled,
+                    "Clicking the checkbox again did not unmark it in place.");
+                ToggleMark(projectBox);
                 Click(FindVisual<TextBlock>(projectRow, label => label.Text == "Projects"));
                 Assert(path.Text == Path.Combine(fixture, "Projects"), "One click did not open a folder row.");
                 back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert((await FindMark(entries, projects)).IsChecked == true, "Opening a marked folder lost its mark.");
+                await FindMark(entries, windows);
+                var criticalRow = (ListBoxItem)entries.ItemContainerGenerator.ContainerFromItem(windows);
+                Click(FindVisual<Grid>(criticalRow, area => area.Name == "MarkArea"));
+                Assert(path.Text == fixture && !(bool)entryType.GetProperty("IsMarked").GetValue(windows),
+                    "Clicking a disabled checkbox opened or marked a protected folder.");
                 ((Button)WindowField(window, "_clearMarks")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 await Mark(entries, report);
                 var nextPage = (Button)WindowField(window, "_mapNext");
@@ -670,9 +685,12 @@ internal static class Verification
     {
         var box = await FindMark(entries, entry);
         Assert(box.IsEnabled, "Expected a markable file row.");
-        box.SetCurrentValue(CheckBox.IsCheckedProperty, true);
-        box.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent, box));
+        if (box.IsChecked != true)
+            ToggleMark(box);
     }
+
+    private static void ToggleMark(CheckBox box) =>
+        typeof(CheckBox).GetMethod("OnClick", PrivateInstance).Invoke(box, null);
 
     private static void Click(UIElement target)
     {
