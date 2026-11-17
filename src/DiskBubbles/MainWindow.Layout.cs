@@ -98,6 +98,8 @@ namespace DiskBubbles
             navigation.Children.Add(history);
             navigation.Children.Add(_rescan);
             var location = new StackPanel { Margin = new Thickness(0, 0, 12, 0) };
+            _crumbs.MinHeight = 27;
+            _crumbs.VerticalAlignment = VerticalAlignment.Center;
             var crumbScroll = new ScrollViewer
             {
                 Content = _crumbs, HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
@@ -223,12 +225,14 @@ namespace DiskBubbles
             foreach (var button in new[] { _mapPrevious, _mapNext })
             {
                 button.Style = (Style)FindResource("QuietButton");
-                button.MinHeight = 30;
-                button.Width = 32;
+                button.MinHeight = 32;
+                button.Width = 36;
                 button.Padding = new Thickness(5);
             }
             FormatLabel(_mapRange, 12, "Muted");
             _mapRange.Margin = new Thickness(8, 0, 8, 0);
+            _mapRange.MinWidth = 76;
+            _mapRange.TextAlignment = TextAlignment.Center;
             _mapRange.VerticalAlignment = VerticalAlignment.Center;
             _mapRange.ToolTip = "Sorted by size. Each item has a bubble. Small items use a minimum visible size.";
             _mapPager.Children.Add(_mapPrevious);

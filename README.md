@@ -13,9 +13,9 @@ Windows can tell you that a drive is nearly full. Figuring out which project, do
 - **Scan a drive or folder.** See progress as Windows enumerates the files. You can cancel a scan and return to your previous results.
 - **Explore by size.** Click a folder in the list or on the map to open it. Hover to see its size and share of the current folder. Use the map arrows to see smaller entries, including empty ones. Back and Forward remember your scroll position and map page.
 - **Mark items as you browse.** Check files or folders anywhere in the scan. Use the trash icon at the bottom right to review everything together. The app protects critical Windows locations and verifies file identities before asking Windows to move anything.
-- **Switch between light and dark.** The beige and graphite themes are included, and the app remembers your choice. Motion follows the Windows animation setting.
+- **Switch between light and dark.** Cream and ink give the light map a soft orchid glow. The dark map uses ice white against midnight with a green aurora. The app remembers your choice and follows the Windows animation setting.
 
-![Disk Bubbles in beige light mode with frosted glass bubbles.](docs/screenshots/light.png)
+![Disk Bubbles in the cream and ink theme with frosted glass bubbles.](docs/screenshots/light.png)
 
 ## Run it
 

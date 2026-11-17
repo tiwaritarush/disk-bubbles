@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 
 namespace DiskBubbles
 {
@@ -85,30 +86,25 @@ namespace DiskBubbles
         private readonly Typeface _nameFont = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal,
             FontWeights.SemiBold, FontStretches.Normal);
         private readonly Typeface _sizeFont = new Typeface("Segoe UI");
-        private readonly Brush _nameInk = new SolidColorBrush(Color.FromRgb(240, 246, 255));
-        private readonly Brush _sizeInk = new SolidColorBrush(Color.FromRgb(210, 212, 223));
-        private static readonly Brush LightNameInk = new SolidColorBrush(Color.FromRgb(35, 44, 42));
-        private static readonly Brush LightSizeInk = new SolidColorBrush(Color.FromRgb(56, 68, 61));
-        private Brush NameInk => Appearance.IsLight ? LightNameInk : _nameInk;
-        private Brush SizeInk => Appearance.IsLight ? LightSizeInk : _sizeInk;
+        private Brush NameInk => (Brush)FindResource("Ink");
+        private Brush SizeInk => (Brush)FindResource("Muted");
         private static readonly Geometry FolderBack = Geometry.Parse("M 1,11 Q 1,8 4,8 L 12,8 16,12 29,12 Q 31,12 31,15 L 31,25 Q 31,28 28,28 L 4,28 Q 1,28 1,25 Z");
         private static readonly Geometry FolderFront = Geometry.Parse("M 1,16 Q 1,13 4,13 L 28,13 Q 31,13 31,16 L 31,25 Q 31,28 28,28 L 4,28 Q 1,28 1,25 Z");
         private static readonly Geometry FileShape = Geometry.Parse("M 7,4 L 19,4 25,10 25,26 Q 25,28 23,28 L 9,28 Q 7,28 7,26 Z");
         private static readonly Geometry FileFold = Geometry.Parse("M 19,4 L 19,10 25,10 Z");
-        private static readonly Brush FolderFill = new LinearGradientBrush(Color.FromRgb(225, 228, 237), Color.FromRgb(155, 163, 184), 90);
-        private static readonly Brush FolderTab = new SolidColorBrush(Color.FromRgb(147, 151, 170));
-        private static readonly Brush FileFill = new LinearGradientBrush(Color.FromRgb(237, 239, 246), Color.FromRgb(160, 169, 189), 90);
-        private static readonly Brush FoldFill = new SolidColorBrush(Color.FromRgb(129, 138, 159));
-        private static readonly Brush LightFolderFill = new LinearGradientBrush(Color.FromRgb(119, 154, 149), Color.FromRgb(45, 85, 87), 90);
-        private static readonly Brush LightFileFill = new LinearGradientBrush(Color.FromRgb(120, 149, 147), Color.FromRgb(50, 82, 84), 90);
-        private static readonly Brush LightIconTab = new SolidColorBrush(Color.FromRgb(82, 118, 112));
-        private static readonly Color FolderGlass = Color.FromRgb(166, 181, 211);
-        private static readonly Color FileGlass = Color.FromRgb(170, 173, 186);
-        private static readonly Color LightFolderGlass = Color.FromRgb(165, 181, 184);
-        private static readonly Color LightFileGlass = Color.FromRgb(191, 184, 171);
+        private static readonly Brush FolderFill = new LinearGradientBrush(Color.FromRgb(232, 238, 242), Color.FromRgb(157, 180, 196), 90);
+        private static readonly Brush FolderTab = new SolidColorBrush(Color.FromRgb(137, 159, 180));
+        private static readonly Brush FileFill = new LinearGradientBrush(Color.FromRgb(232, 238, 242), Color.FromRgb(160, 177, 190), 90);
+        private static readonly Brush FoldFill = new SolidColorBrush(Color.FromRgb(136, 158, 176));
+        private static readonly Brush LightFolderFill = new LinearGradientBrush(Color.FromRgb(91, 79, 69), Color.FromRgb(43, 37, 32), 90);
+        private static readonly Brush LightFileFill = new LinearGradientBrush(Color.FromRgb(109, 93, 81), Color.FromRgb(58, 48, 42), 90);
+        private static readonly Brush LightIconTab = new SolidColorBrush(Color.FromRgb(106, 91, 77));
+        private static readonly Color FolderGlass = Color.FromRgb(159, 186, 201);
+        private static readonly Color FileGlass = Color.FromRgb(162, 175, 191);
+        private static readonly Color LightFolderGlass = Color.FromRgb(189, 174, 174);
+        private static readonly Color LightFileGlass = Color.FromRgb(184, 176, 165);
         private static readonly Brush PressShade = new SolidColorBrush(Color.FromArgb(58, 9, 10, 13));
-        private static readonly Brush DarkWash = Glow(Color.FromArgb(45, 91, 117, 169), 0.64, 0.50);
-        private static readonly Brush LightWash = Glow(Color.FromArgb(57, 255, 255, 255), 0.64, 0.50);
+        private static readonly Brush LightWash = Glow(Color.FromArgb(42, 255, 255, 255), 0.64, 0.50);
         private static readonly Brush DarkReflection = Glow(Color.FromArgb(70, 226, 238, 255), 0.5, 0.5);
         private static readonly Brush LightReflection = Glow(Color.FromArgb(106, 255, 255, 255), 0.5, 0.5);
 
@@ -128,6 +124,8 @@ namespace DiskBubbles
         private readonly DrawingGroup _pointerLight = new DrawingGroup();
         private readonly DrawingGroup _highlight = new DrawingGroup();
         private readonly TranslateTransform _reflectionPosition = new TranslateTransform();
+        private BitmapSource _aurora;
+        private Brush _blush;
         private EventHandler _startOnFrame;
         private int _transitionId;
         private bool _transitioning;
@@ -320,7 +318,7 @@ namespace DiskBubbles
             _startOnFrame = (sender, args) =>
             {
                 CancelFrameStart();
-                int duration = pageDirection == 0 ? UiMotion.ZoomMs : UiMotion.PageSlideMs;
+                int duration = pageDirection != 0 ? UiMotion.PageSlideMs : returning ? UiMotion.ZoomBackMs : UiMotion.ZoomMs;
                 outgoing.MoveTo(outgoingEnd, 0, duration);
                 incoming.MoveTo(Matrix.Identity, 1, duration, (clock, completed) =>
                 {
@@ -460,13 +458,34 @@ namespace DiskBubbles
 
         protected override void OnRender(DrawingContext drawing)
         {
-            drawing.DrawRectangle(Appearance.IsLight ? LightWash : DarkWash, null, new Rect(RenderSize));
+            var bounds = new Rect(RenderSize);
+            drawing.DrawRectangle(Brushes.Transparent, null, bounds);
+            if (bounds.Width <= 0 || bounds.Height <= 0 || SystemParameters.HighContrast)
+                return;
+
+            if (Appearance.IsLight)
+            {
+                drawing.DrawRectangle(LightWash, null, bounds);
+                if (_blush == null)
+                {
+                    Color pink = ((SolidColorBrush)FindResource("Atmosphere")).Color;
+                    _blush = Glow(Color.FromArgb(25, pink.R, pink.G, pink.B), 0.59, 0.49, new Point(0.67, 0.57));
+                }
+                drawing.DrawRectangle(_blush, null, bounds);
+            }
+            else
+            {
+                _aurora ??= AuroraBackdrop.Create(((SolidColorBrush)FindResource("Atmosphere")).Color);
+                drawing.DrawImage(_aurora, bounds);
+            }
         }
 
-        private static Brush Glow(Color color, double radiusX, double radiusY)
+        private static Brush Glow(Color color, double radiusX, double radiusY, Point? origin = null)
         {
             var brush = new RadialGradientBrush(color, Color.FromArgb(0, color.R, color.G, color.B))
                 { RadiusX = radiusX, RadiusY = radiusY };
+            if (origin.HasValue)
+                brush.Center = brush.GradientOrigin = origin.Value;
             brush.Freeze();
             return brush;
         }
@@ -498,10 +517,8 @@ namespace DiskBubbles
                         light.Pop();
                         light.Pop();
                     }
-                    Color outline = Appearance.IsLight
-                        ? (selected ? Color.FromRgb(43, 99, 107) : Color.FromRgb(111, 132, 122))
-                        : (selected ? Color.FromRgb(135, 183, 255) : Color.FromArgb(195, 233, 235, 242));
-                    var pen = new Pen(new SolidColorBrush(outline), selected ? 2.1 : 1.35);
+                    Brush outline = selected ? (Brush)FindResource("Accent") : (Brush)FindResource("Subtle");
+                    var pen = new Pen(outline, selected ? 2.1 : 1.35);
                     double rim = bubble.Radius + 0.5;
                     drawing.DrawEllipse(pressed ? PressShade : null, pen, bubble.Center, rim, rim);
                 }

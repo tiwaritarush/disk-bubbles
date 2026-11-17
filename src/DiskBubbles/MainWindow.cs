@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using Forms = System.Windows.Forms;
@@ -87,6 +88,7 @@ namespace DiskBubbles
             SetResourceReference(Control.BackgroundProperty, "Base");
             SetResourceReference(Control.ForegroundProperty, "Ink");
             FontFamily = new FontFamily("Segoe UI");
+            Typography.SetNumeralAlignment(this, FontNumeralAlignment.Tabular);
             UseLayoutRounding = true;
             TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
             UiVisuals.ThemeCaption(this);

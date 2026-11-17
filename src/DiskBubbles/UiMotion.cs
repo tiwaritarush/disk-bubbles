@@ -11,6 +11,7 @@ namespace DiskBubbles
     {
         public const int HoverMs = 100;
         public const int ZoomMs = 285;
+        public const int ZoomBackMs = 230;
         public const int PageSlideMs = 205;
         public const int RevealMs = 210;
         public const int DialogEnterMs = 225;
@@ -45,6 +46,16 @@ namespace DiskBubbles
             animation.KeyFrames.Add(new SplineDoubleKeyFrame(to, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(milliseconds)),
                 new KeySpline(0.28, 0.08, 0.24, 1)));
             return animation;
+        }
+
+        public static void Acknowledge(UIElement element)
+        {
+            if (!SystemParameters.ClientAreaAnimation)
+                return;
+
+            var acknowledgment = Ease(Math.Min(0.79, element.Opacity), 1, 125);
+            acknowledgment.FillBehavior = FillBehavior.Stop;
+            element.BeginAnimation(UIElement.OpacityProperty, acknowledgment);
         }
     }
 

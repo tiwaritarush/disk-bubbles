@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using IOPath = System.IO.Path;
 
 namespace DiskBubbles
@@ -30,6 +31,7 @@ namespace DiskBubbles
             else
                 _marked.Remove(entry);
             UpdateMarks();
+            UiMotion.Acknowledge(_selectionSummary);
         }
 
         private void ClearMarks()
@@ -48,6 +50,7 @@ namespace DiskBubbles
             long bytes = MarkedRoots().Aggregate(0L, (total, mark) => DiskScanner.AddBytes(total, mark.Entry.Bytes));
             _selectionSummary.Text = _marked.Count == 0 ? "No items marked" : $"{CountLabel(_marked.Count, "item")} marked · {DiskEntry.FormatSize(bytes)}";
             _reviewRecycle.IsEnabled = _clearMarks.IsEnabled = _marked.Count > 0;
+            _clearMarks.Visibility = _marked.Count > 0 ? Visibility.Visible : Visibility.Hidden;
             UpdateSelection();
         }
 

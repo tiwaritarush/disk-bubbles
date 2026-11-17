@@ -148,10 +148,10 @@ namespace DiskBubbles
             {
                 Center = new Point(0.45, 0.49), GradientOrigin = new Point(0.29, 0.18), RadiusX = 0.72, RadiusY = 0.82,
             };
-            body.GradientStops.Add(new GradientStop(Tint(tone, 0.35, 227), 0));
-            body.GradientStops.Add(new GradientStop(Tint(tone, 0.14, 217), 0.47));
-            body.GradientStops.Add(new GradientStop(Tint(tone, 0.08, 210), 0.75));
-            body.GradientStops.Add(new GradientStop(Tint(tone, 0.19, 234), 1));
+            body.GradientStops.Add(new GradientStop(Tint(tone, 0.36, 216), 0));
+            body.GradientStops.Add(new GradientStop(Tint(tone, 0.15, 186), 0.47));
+            body.GradientStops.Add(new GradientStop(Tint(tone, 0.09, 178), 0.75));
+            body.GradientStops.Add(new GradientStop(Tint(tone, 0.22, 211), 1));
             drawing.DrawEllipse(body, null, center, radius, radius);
 
             if (radius >= 20)
@@ -284,7 +284,7 @@ namespace DiskBubbles
         }
 
         private static Color Tint(Color tone, double amount, byte alpha) => Color.FromArgb(alpha,
-            (byte)(22 + (tone.R - 22) * amount), (byte)(22 + (tone.G - 22) * amount), (byte)(26 + (tone.B - 26) * amount));
+            (byte)(6 + (tone.R - 6) * amount), (byte)(12 + (tone.G - 12) * amount), (byte)(23 + (tone.B - 23) * amount));
 
         private static Color Alpha(Color color, byte alpha) => Color.FromArgb(alpha, color.R, color.G, color.B);
     }
@@ -305,19 +305,19 @@ namespace DiskBubbles
 
             Point center = new Point(220, 185);
             drawing.PushTransform(new RotateTransform(-28, center.X, center.Y));
-            Color orbitColor = Appearance.IsLight ? Color.FromArgb(97, 104, 112, 102) : Color.FromArgb(79, 202, 204, 217);
+            Color orbitColor = Appearance.IsLight ? Color.FromArgb(97, 112, 100, 89) : Color.FromArgb(79, 202, 204, 217);
             var orbit = new Pen(new LinearGradientBrush(Colors.Transparent, orbitColor, 30), 1.05);
             drawing.DrawEllipse(null, orbit, center, 181, 80);
             drawing.Pop();
-            Color lens = Appearance.IsLight ? Color.FromRgb(168, 185, 188) : Silver;
-            Color smallLens = Appearance.IsLight ? Color.FromRgb(191, 184, 169) : Smoke;
+            Color lens = Appearance.IsLight ? Color.FromRgb(189, 174, 174) : Silver;
+            Color smallLens = Appearance.IsLight ? Color.FromRgb(184, 176, 165) : Smoke;
             GlassOrb.Draw(drawing, center, 119, lens);
             GlassOrb.Draw(drawing, new Point(346, 95), 44, smallLens);
             GlassOrb.Draw(drawing, new Point(91, 244), 42, lens);
 
             drawing.PushTransform(new TranslateTransform(185, 162));
             drawing.PushTransform(new ScaleTransform(3.12, 3.12));
-            Color diskIcon = Appearance.IsLight ? Color.FromRgb(54, 90, 87) : Color.FromArgb(223, 242, 244, 250);
+            Color diskIcon = Appearance.IsLight ? Color.FromRgb(47, 39, 33) : Color.FromArgb(223, 232, 238, 242);
             drawing.DrawGeometry(null,
                 new Pen(new SolidColorBrush(diskIcon), 0.76) { LineJoin = PenLineJoin.Round },
                 Geometry.Parse(UiVisuals.Drive));

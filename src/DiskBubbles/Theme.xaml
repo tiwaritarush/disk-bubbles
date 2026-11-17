@@ -65,7 +65,8 @@
         <ControlTemplate TargetType="Button">
           <Grid>
             <Border x:Name="Frame" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                    BorderThickness="1" CornerRadius="12" Padding="{TemplateBinding Padding}">
+                    BorderThickness="1" CornerRadius="12" Padding="{TemplateBinding Padding}" RenderTransformOrigin="0.5,0.5"
+                    Tag="{DynamicResource {x:Static SystemParameters.ClientAreaAnimationKey}}">
               <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center" RecognizesAccessKey="True" />
             </Border>
             <Border x:Name="FocusRing" Margin="-3" CornerRadius="14" BorderThickness="1" BorderBrush="{DynamicResource Accent}"
@@ -79,8 +80,17 @@
               <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
-              <Setter TargetName="Frame" Property="Opacity" Value="0.75" />
+              <Setter TargetName="Frame" Property="Opacity" Value="0.86" />
             </Trigger>
+            <MultiDataTrigger>
+              <MultiDataTrigger.Conditions>
+                <Condition Binding="{Binding IsPressed, RelativeSource={RelativeSource TemplatedParent}}" Value="True" />
+                <Condition Binding="{Binding Tag, ElementName=Frame}" Value="True" />
+              </MultiDataTrigger.Conditions>
+              <Setter TargetName="Frame" Property="RenderTransform">
+                <Setter.Value><ScaleTransform ScaleX="0.97" ScaleY="0.97" /></Setter.Value>
+              </Setter>
+            </MultiDataTrigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter TargetName="Frame" Property="Opacity" Value="0.42" />
             </Trigger>

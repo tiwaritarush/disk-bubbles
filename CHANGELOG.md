@@ -1,5 +1,11 @@
 # Changelog
 
+## 10.2.0
+
+- Refresh the light theme with cream and ink and add a soft orchid reflection to the map. The dark theme uses midnight and ice white with a green aurora behind the bubbles.
+- Line up storage figures, give the map arrows larger targets, and keep the layout steady as you browse or mark items.
+- Make the return zoom quicker and add subtle press and mark feedback when Windows animations are enabled.
+
 ## 10.1.2
 
 - Keep the first folder zoom playing when the map changes size as you leave the drive overview.
