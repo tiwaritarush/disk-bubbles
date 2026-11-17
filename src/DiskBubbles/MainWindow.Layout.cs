@@ -377,7 +377,7 @@ namespace DiskBubbles
         {
             var intro = new StackPanel { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
                 MaxWidth = 560, Margin = new Thickness(16, 12, 16, 20) };
-            var art = new StorageIllustration { IsHitTestVisible = false, Width = 280, Height = 174,
+            var art = new StorageIllustration { IsHitTestVisible = false, Width = 460, Height = 174,
                 HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 14) };
             _illustrations.Add(art);
             intro.Children.Add(art);

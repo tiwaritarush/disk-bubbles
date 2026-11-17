@@ -17,29 +17,44 @@ namespace DiskBubbles
         public const string Refresh = "M 19,8 A 8,8 0 1 0 19,16 M 19,3 V 8 H 14";
         public const string Folder = "M 3,6 Q 3,4 5,4 H 10 L 13,7 H 20 Q 22,7 22,9 V 18 Q 22,20 20,20 H 5 Q 3,20 3,18 Z";
         public const string Drive = "M 5,6 H 19 L 22,15 V 18 Q 22,20 20,20 H 4 Q 2,20 2,18 V 15 Z M 2,15 H 22 M 17,18 H 19";
+        public const string Apps = "M 3,3 H 10 V 10 H 3 Z M 14,3 H 21 V 10 H 14 Z M 3,14 H 10 V 21 H 3 Z M 14,14 H 21 V 21 H 14 Z";
         public const string Bin = "M 4,7 H 20 M 9,7 V 4 H 15 V 7 M 6,7 L 7,20 H 17 L 18,7 M 10,10 V 17 M 14,10 V 17";
         public const string Sun = "M 12,8 A 4,4 0 1 1 11.99,8 M 12,2 V 4 M 12,20 V 22 M 2,12 H 4 M 20,12 H 22 M 5,5 L 6.5,6.5 M 17.5,17.5 L 19,19 M 5,19 L 6.5,17.5 M 17.5,6.5 L 19,5";
         public const string Moon = "M 19.5,15 A 8,8 0 1 1 9,4.5 A 6.5,6.5 0 0 0 19.5,15 Z";
 
         private static Brush _darkBlush;
         private static Brush _lightBlush;
+        private static Brush _darkReflection;
+        private static Brush _lightReflection;
 
         public static void DrawBlush(DrawingContext drawing, Rect bounds)
         {
             if (SystemParameters.HighContrast || bounds.Width <= 0 || bounds.Height <= 0)
                 return;
 
-            Brush blush = Appearance.IsLight ? (_lightBlush ??= BlushBrush(38)) : (_darkBlush ??= BlushBrush(49));
+            Brush blush = Appearance.IsLight ? (_lightBlush ??= BlushBrush(95)) : (_darkBlush ??= BlushBrush(72));
             drawing.DrawEllipse(blush, null, new Point(bounds.X + bounds.Width * 0.5, bounds.Y + bounds.Height * 0.5),
-                bounds.Width * 0.46, bounds.Height * 0.47);
+                bounds.Width * 0.5, bounds.Height * 0.5);
         }
 
-        private static Brush BlushBrush(byte strength)
+        public static void DrawReflection(DrawingContext drawing, Point center, double radius)
+        {
+            if (SystemParameters.HighContrast)
+                return;
+            Brush light = Appearance.IsLight ? (_lightReflection ??= BlushBrush(67, true)) : (_darkReflection ??= BlushBrush(60, true));
+            drawing.DrawEllipse(light, null, center, radius, radius);
+        }
+
+        private static Brush BlushBrush(byte strength, bool reflection = false)
         {
             Color tint = ((SolidColorBrush)Application.Current.FindResource("Atmosphere")).Color;
-            var brush = new RadialGradientBrush { RadiusX = 0.5, RadiusY = 0.5 };
+            var brush = reflection
+                ? new RadialGradientBrush { Center = new Point(0.56, 0.92), GradientOrigin = new Point(0.61, 0.98), RadiusX = 0.6, RadiusY = 0.42 }
+                : new RadialGradientBrush { RadiusX = 0.5, RadiusY = 0.5 };
             brush.GradientStops.Add(new GradientStop(Color.FromArgb(strength, tint.R, tint.G, tint.B), 0));
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(strength / 2), tint.R, tint.G, tint.B), 0.46));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(strength * 0.56), tint.R, tint.G, tint.B), 0.48));
+            if (!reflection)
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(strength * 0.19), tint.R, tint.G, tint.B), 0.82));
             brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, tint.R, tint.G, tint.B), 1));
             brush.Freeze();
             return brush;
@@ -177,6 +192,7 @@ namespace DiskBubbles
             body.GradientStops.Add(new GradientStop(Tint(tone, 0.09, 178), 0.75));
             body.GradientStops.Add(new GradientStop(Tint(tone, 0.22, 211), 1));
             drawing.DrawEllipse(body, null, center, radius, radius);
+            UiVisuals.DrawReflection(drawing, center, radius);
 
             if (radius >= 20)
             {
@@ -237,6 +253,7 @@ namespace DiskBubbles
                 refraction.GradientStops.Add(new GradientStop(Alpha(tone, 48), 0.52));
                 refraction.GradientStops.Add(new GradientStop(Alpha(tone, 0), 1));
                 drawing.DrawEllipse(refraction, null, center, radius, radius);
+                UiVisuals.DrawReflection(drawing, center, radius);
                 drawing.DrawEllipse(LightRimFrost, null, center, radius, radius);
                 drawing.DrawEllipse(LightGlint, null, center, radius, radius);
                 drawing.DrawEllipse(FrostGrain.Value, null, center, radius - 0.9, radius - 0.9);
@@ -319,7 +336,7 @@ namespace DiskBubbles
 
         protected override void OnRender(DrawingContext drawing)
         {
-            const double width = 280;
+            const double width = 460;
             const double height = 174;
             var center = new Point(width / 2, height / 2);
             double scale = Math.Min(ActualWidth / width, ActualHeight / height);
