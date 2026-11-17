@@ -2,9 +2,13 @@
 
 ## App Cleaner
 
-App Cleaner reads desktop app registrations and the current user’s Store catalog. It measures readable install folders with the same Windows directory reader that Disk Scan uses. Sizes reflect the files Windows returned, and a partial measurement is shown as a lower bound. Uninstall review names each action before opening its registered desktop uninstaller, removing a Store package, or handing off to Windows Settings.
+App Cleaner reads desktop app registrations and the current user’s Store catalog. It measures readable install folders with the same Windows directory reader that Disk Scan uses. Sizes reflect the files Windows returned, and a partial measurement is shown as a lower bound.
 
-After a desktop uninstall, the current session can identify its remaining install folder. Disk Bubbles checks for other registrations that use the folder before allowing it through the existing Recycle Bin review.
+Uninstall review names each action before launching a verified MSI or vendor removal command or removing a supported Store package for the current user. Unsupported commands produce an explanation inside App Cleaner. A confirmed removal updates the visible collection directly. Manual scans refresh the full inventory.
+
+Deep Uninstall also looks for matching app data and caches. Candidate paths come from registered install locations, exact app and publisher names, or a Store package family. Cleanup rejects protected locations, filesystem links, driver files, and folders used by another app or service. A fresh check runs before each reviewed Recycle Bin move. Leftover discoveries belong to the current app session.
+
+The verification fixture covers removal-command validation, both uninstall review flows, rejected cleanup candidates, themed busy states, and updates to the visible app list. Live Desktop and Store uninstalls still need manual validation.
 
 `src/DiskBubbles` contains the native Windows app. `tests/Verification.cs` drives it with disposable fixtures. `Build.ps1` invokes the .NET SDK compiler and embeds the XAML, manifest, and icon into one executable.
 
