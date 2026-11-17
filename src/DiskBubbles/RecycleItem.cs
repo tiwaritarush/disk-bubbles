@@ -61,7 +61,9 @@ namespace DiskBubbles
             return items;
         }
 
-        internal static Task<List<RecycleItem>> MoveAsync(IEnumerable<RecycleItem> selection)
+        internal static Task<List<RecycleItem>> MoveAsync(IEnumerable<RecycleItem> selection) => MoveWithCheckAsync(selection, null);
+
+        internal static Task<List<RecycleItem>> MoveWithCheckAsync(IEnumerable<RecycleItem> selection, Action<RecycleItem> check)
         {
             var completion = new TaskCompletionSource<List<RecycleItem>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var worker = new Thread(() =>
@@ -73,6 +75,7 @@ namespace DiskBubbles
                     {
                         try
                         {
+                            check?.Invoke(item);
                             item.Move();
                             moved.Add(item);
                         }

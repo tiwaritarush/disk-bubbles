@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -30,7 +29,10 @@ namespace DiskBubbles
         private readonly TextBox _search = new TextBox { Width = 280, HorizontalAlignment = HorizontalAlignment.Left, VerticalContentAlignment = VerticalAlignment.Center };
         private readonly Button _refresh = new Button { Content = "Scan apps" };
         private readonly Button _leftoverMode = new Button { Content = "Leftovers" };
-        private readonly Button _review = new Button();
+        private readonly Button _uninstall = new Button { Content = "Uninstall" };
+        private readonly Button _deepUninstall = new Button { Content = "Deep Uninstall" };
+        private readonly Button _recycleLeftover = new Button { Content = "Review Recycle Bin move" };
+        private readonly TextBlock _actionNote = Label("", 13, "Muted");
         private readonly Button _openFolder = new Button { Content = "Open folder…" };
         private readonly TextBlock _status = Label("", 14, "Muted");
         private readonly TextBlock _summary = Label("", 14, "Ink", true);
@@ -40,7 +42,6 @@ namespace DiskBubbles
         private readonly TextBlock _itemInfo = Label("", 15, "Muted");
         private readonly TextBlock _itemSize = Label("", 27, "Ink", true);
         private readonly TextBlock _itemPath = Label("", 13, "Muted");
-        private readonly List<InstalledApp> _receipts = new List<InstalledApp>();
         private readonly List<AppLeftover> _leftovers = new List<AppLeftover>();
         private List<InstalledApp> _apps = new List<InstalledApp>();
         private CancellationTokenSource _scan;
@@ -48,7 +49,7 @@ namespace DiskBubbles
         private bool _writing;
         private bool _showLeftovers;
         private bool _closed;
-        internal bool MovingFiles { get; private set; }
+        internal bool MovingFiles => _writing;
 
         public AppCleanerPage(Window owner, Action<string> openExplorer, Action storageChanged, Action<bool> writeStateChanged)
         {
@@ -85,10 +86,11 @@ namespace DiskBubbles
                 string location = SelectedLocation();
                 if (location != null && Directory.Exists(location)) _openExplorer("\"" + location + "\"");
             };
-            _review.Click += async (sender, args) =>
+            _uninstall.Click += async (sender, args) => await ReviewUninstallAsync(deep: false);
+            _deepUninstall.Click += async (sender, args) => await ReviewUninstallAsync(deep: true);
+            _recycleLeftover.Click += async (sender, args) =>
             {
-                if (_showLeftovers) await RecycleLeftoverAsync();
-                else await ReviewUninstallAsync();
+                if (_list.SelectedItem is AppLeftover item) await ReviewLeftoversAsync(new[] { item });
             };
             UpdateList();
         }
@@ -100,7 +102,6 @@ namespace DiskBubbles
             Children.Add(_results);
             _results.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             _results.RowDefinitions.Add(new RowDefinition());
-            _results.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             var top = new DockPanel { Margin = new Thickness(3, 0, 3, 15) };
             var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
@@ -119,7 +120,8 @@ namespace DiskBubbles
             columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) });
             columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(242) });
             var table = new DockPanel { Margin = new Thickness(15, 14, 12, 10) };
-            var toolbar = new DockPanel { Margin = new Thickness(0, 0, 8, 9) };
+            var tableHeader = new StackPanel { Margin = new Thickness(0, 0, 8, 9) };
+            var toolbar = new DockPanel();
             var filter = Label("Filter by name", 14, "Muted");
             filter.VerticalAlignment = VerticalAlignment.Center;
             filter.Margin = new Thickness(0, 0, 12, 0);
@@ -135,8 +137,11 @@ namespace DiskBubbles
             _search.SetResourceReference(TextBox.CaretBrushProperty, "Ink");
             AutomationProperties.SetName(_search, "Filter by app or publisher name");
             toolbar.Children.Add(_search);
-            DockPanel.SetDock(toolbar, Dock.Top);
-            table.Children.Add(toolbar);
+            tableHeader.Children.Add(toolbar);
+            _summary.Margin = new Thickness(0, 7, 0, 0);
+            tableHeader.Children.Add(_summary);
+            DockPanel.SetDock(tableHeader, Dock.Top);
+            table.Children.Add(tableHeader);
 
             _list.ItemContainerStyle = (Style)FindResource("EntryRow");
             _list.SetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Disabled);
@@ -161,21 +166,23 @@ namespace DiskBubbles
             _openFolder.Margin = new Thickness(0, 14, 0, 0);
             _openFolder.HorizontalAlignment = HorizontalAlignment.Left;
             details.Children.Add(_openFolder);
-            var side = UiVisuals.FrostedPane(new ScrollViewer { Content = details, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled },
-                "GlassClear");
+            var inspector = new DockPanel();
+            var choices = new StackPanel { Margin = new Thickness(17, 10, 16, 16) };
+            _actionNote.TextWrapping = TextWrapping.Wrap;
+            _actionNote.Margin = new Thickness(0, 0, 0, 8);
+            choices.Children.Add(_actionNote);
+            _deepUninstall.Margin = new Thickness(0, 7, 0, 0);
+            choices.Children.Add(_uninstall);
+            choices.Children.Add(_deepUninstall);
+            choices.Children.Add(_recycleLeftover);
+            DockPanel.SetDock(choices, Dock.Bottom);
+            inspector.Children.Add(choices);
+            inspector.Children.Add(new ScrollViewer { Content = details, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
+            var side = UiVisuals.FrostedPane(inspector, "GlassClear");
             SetColumn(side, 2);
             columns.Children.Add(side);
             SetRow(columns, 1);
             _results.Children.Add(columns);
-
-            var footer = new DockPanel { Margin = new Thickness(3, 12, 3, 0) };
-            UiVisuals.Emphasize(_review);
-            DockPanel.SetDock(_review, Dock.Right);
-            footer.Children.Add(_review);
-            _summary.VerticalAlignment = VerticalAlignment.Center;
-            footer.Children.Add(_summary);
-            SetRow(footer, 2);
-            _results.Children.Add(footer);
 
             var icon = UiVisuals.Icon(UiVisuals.Apps, "Muted", 34);
             icon.HorizontalAlignment = HorizontalAlignment.Center;
@@ -231,17 +238,16 @@ namespace DiskBubbles
                 var result = await Task.Run(() => AppInventory.Scan(cancellation.Token, progress), cancellation.Token);
                 if (_closed) return;
                 cancellation.Token.ThrowIfCancellationRequested();
-                var leftovers = await Task.Run(() => FindLeftovers(result.Apps, cancellation.Token), cancellation.Token);
-                if (_closed) return;
-                cancellation.Token.ThrowIfCancellationRequested();
                 var marked = new HashSet<string>(_apps.Where(app => app.Marked).Select(app => app.Id), StringComparer.OrdinalIgnoreCase);
+                string previous = (_list.SelectedItem as InstalledApp)?.Id;
                 _apps = result.Apps.OrderByDescending(app => app.Bytes).ThenBy(app => app.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
                 foreach (var app in _apps) app.Marked = app.CanMark && marked.Contains(app.Id);
                 _loaded = true;
                 _status.Text = $"{_apps.Count:N0} installed apps · largest measured first" + (result.StoreUnavailable ? " · Store list unavailable" : "");
-                _leftovers.Clear();
-                _leftovers.AddRange(leftovers);
+                _leftovers.RemoveAll(item => _apps.Any(app => app.Id == item.App.Id));
                 UpdateList();
+                if (previous != null && !_showLeftovers)
+                    _list.SelectedItem = _apps.FirstOrDefault(app => app.Id == previous);
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { _status.Text = "App scan canceled."; }
             catch (Exception error) when (AppInventory.IsRegistryError(error) || error is Win32Exception)
@@ -257,34 +263,6 @@ namespace DiskBubbles
                     if (returnFocus && _loaded) _refresh.Focus();
                 }
             }
-        }
-
-        private List<AppLeftover> FindLeftovers(IReadOnlyList<InstalledApp> installed, CancellationToken token)
-        {
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var items = new List<AppLeftover>();
-            foreach (var app in _receipts)
-            {
-                token.ThrowIfCancellationRequested();
-                if (IsLeftover(app, installed) && seen.Add(app.Location))
-                    items.Add(new AppLeftover(app, AppInventory.Measure(app.Location, token).Bytes));
-            }
-            return items;
-        }
-
-        private static bool IsLeftover(InstalledApp app, IReadOnlyList<InstalledApp> installed)
-        {
-            if (!AppInventory.IsDedicated(app.Location) || !AppInventory.IsPlainDirectory(app.Location))
-                return false;
-            try
-            {
-                if (AppInventory.IsRegistered(app))
-                    return false;
-            }
-            catch (Exception error) when (AppInventory.IsRegistryError(error)) { return false; }
-
-            return !installed.Any(other => other.Location != null && (SystemProtection.IsInside(other.Location, app.Location) ||
-                SystemProtection.IsInside(app.Location, other.Location)));
         }
 
         private void UpdateList()
@@ -317,21 +295,23 @@ namespace DiskBubbles
             bool ready = _scan == null && !_writing;
             _itemIcon.Content = _list.SelectedItem as InstalledApp;
             _itemIcon.Visibility = _itemIcon.Content == null ? Visibility.Collapsed : Visibility.Visible;
-            _review.Content = _showLeftovers ? "Review Recycle Bin move" : "Review uninstall";
+            _recycleLeftover.Visibility = _showLeftovers ? Visibility.Visible : Visibility.Collapsed;
             _search.IsEnabled = _list.IsEnabled = ready;
             _refresh.IsEnabled = !_writing;
             _leftoverMode.IsEnabled = ready;
             _openFolder.Visibility = SelectedLocation() == null ? Visibility.Collapsed : Visibility.Visible;
+            _openFolder.IsEnabled = ready;
             if (_showLeftovers)
             {
                 var item = _list.SelectedItem as AppLeftover;
                 bool canRecycle = item != null && SystemProtection.ForPath(item.Location) == EntryProtection.None;
                 _itemName.Text = item?.Name ?? "Leftover folders";
-                _itemInfo.Text = item == null ? "Folders still present after uninstall will appear here."
-                    : canRecycle ? "Can be reviewed for recycling" : "Managed by Windows";
+                _itemInfo.Text = item?.Kind ?? "Folders found after uninstall appear here.";
                 _itemSize.Text = item?.SizeLabel ?? "";
                 _summary.Text = $"{_leftovers.Count:N0} leftover folders";
-                _review.IsEnabled = ready && canRecycle;
+                _recycleLeftover.IsEnabled = ready && canRecycle;
+                _uninstall.Visibility = _deepUninstall.Visibility = Visibility.Collapsed;
+                _actionNote.Text = "";
             }
             else
             {
@@ -347,79 +327,114 @@ namespace DiskBubbles
                 _itemSize.Text = app?.SizeLabel ?? "";
                 _summary.Text = count == 0 ? $"{_list.Items.Count:N0} apps shown" : $"{count:N0} marked" +
                     (measured > 0 ? $" · {DiskEntry.FormatSize(measured)} measured" : "");
-                _review.IsEnabled = ready && (count > 0 || (app != null && !app.Locked));
+                _uninstall.Visibility = _deepUninstall.Visibility = count > 0 || app != null ? Visibility.Visible : Visibility.Collapsed;
+                _uninstall.IsEnabled = _deepUninstall.IsEnabled = ready && (count > 0 || (app != null && !app.Locked));
+                _actionNote.Text = count > 1 ? $"Actions apply to {count:N0} marked apps."
+                    : count == 1 && marked[0] != app ? $"Actions apply to {marked[0].Name}."
+                    : app?.Locked == true ? "Managed by Windows or a driver package." : "";
             }
+            _actionNote.Visibility = _actionNote.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
             _itemPath.Text = SelectedLocation() ?? "";
             _itemPath.ToolTip = _itemPath.Text;
             _itemSize.Visibility = _itemSize.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         }
 
-        private async Task ReviewUninstallAsync()
+        private async Task ReviewUninstallAsync(bool deep)
         {
             if (_writing || _scan != null) return;
             var selected = SelectedApps();
             if (selected.Length == 0) return;
-            var launchable = selected.Where(AppRemoval.CanLaunch).ToArray();
-            var rows = selected.Select(app => $"{app.Name}  ·  {app.Kind}\n" + (launchable.Contains(app)
-                ? app.Package == null ? "Opens the app’s registered uninstaller" : "Removes this package for your Windows account"
-                : "Manage this app in Windows Settings"));
-            if (!Confirm(rows, launchable.Length > 0 ? "Start uninstall" : "Open Windows Settings")) return;
-            if (launchable.Length == 0)
-            {
-                try
-                {
-                    Process.Start(new ProcessStartInfo("ms-settings:appsfeatures") { UseShellExecute = true });
-                    _storageChanged();
-                }
-                catch (Win32Exception) { UiVisuals.Notice(_owner, "Can’t open Settings", "Open Installed apps from Windows Settings.").ShowDialog(); }
-                return;
-            }
 
             SetWriting(true);
             int removed = 0;
-            var unsuccessful = new List<string>();
+            int restart = 0;
+            int unavailable = 0;
+            var found = new List<AppLeftover>();
+            var issues = new List<string>();
             try
             {
+                var launchable = await Task.Run(() => selected.Where(AppRemoval.CanLaunch).ToArray());
+                unavailable = selected.Length - launchable.Length;
+                if (launchable.Length == 0)
+                {
+                    UiVisuals.Notice(_owner, "Uninstall unavailable", "Disk Bubbles couldn’t verify a registered uninstaller for the selected apps.").ShowDialog();
+                    return;
+                }
+
+                var rows = selected.Select(app => app.Name + " · " + app.Kind + "\n" +
+                    (!launchable.Contains(app) ? "Unavailable for in-app uninstall" :
+                    app.Package != null ? "Remove for the current Windows account" : "Run the registered uninstaller"));
+                if (!Confirm(rows, deep))
+                    return;
+
                 foreach (var app in launchable)
                 {
-                    _status.Text = $"Waiting for {app.Name}…";
-                    if (app.Package == null && AppInventory.IsDedicated(app.Location) && !_receipts.Any(entry => entry.Id == app.Id))
-                        _receipts.Add(app);
-                    bool gone = false;
-                    try { gone = await Task.Run(() => AppRemoval.Uninstall(app)); }
+                    _status.Text = $"Uninstalling {app.Name}…";
+                    try
+                    {
+                        var result = await Task.Run(() => AppRemoval.Uninstall(app));
+                        _storageChanged();
+                        if (result == AppUninstallResult.RestartRequired)
+                        {
+                            restart++;
+                            app.Marked = false;
+                            continue;
+                        }
+                        if (result != AppUninstallResult.Removed)
+                        {
+                            issues.Add(app.Name + " is still listed by Windows.");
+                            continue;
+                        }
+
+                        removed++;
+                        app.Marked = false;
+                        _status.Text = $"Checking leftovers for {app.Name}…";
+                        var detected = await Task.Run(() => AppCleanup.Find(app, deep));
+                        foreach (var item in detected)
+                        {
+                            if (_leftovers.Any(other => string.Equals(other.Location, item.Location, StringComparison.OrdinalIgnoreCase)))
+                                continue;
+                            found.Add(item);
+                            _leftovers.Add(item);
+                        }
+                    }
                     catch (Exception error) when (AppInventory.IsRegistryError(error) || error is Win32Exception || error is ArgumentException)
-                    { unsuccessful.Add(app.Name + ": " + error.Message); }
-                    if (_closed) return;
-                    _storageChanged();
-                    if (gone) { removed++; app.Marked = false; }
-                    else if (!unsuccessful.Any(text => text.StartsWith(app.Name + ":", StringComparison.Ordinal)))
-                        unsuccessful.Add(app.Name + " is still listed by Windows.");
+                    {
+                        issues.Add(app.Name + ": " + error.Message);
+                    }
                 }
+
+                if (found.Count > 0)
+                    await MoveReviewedLeftoversAsync(found);
             }
             finally
             {
                 SetWriting(false);
             }
+
             await ScanAsync();
-            _status.Text = $"{removed:N0} removed" + (unsuccessful.Count > 0 ? $" · {unsuccessful.Count:N0} need attention" : "") +
-                (selected.Length > launchable.Length ? $" · {selected.Length - launchable.Length:N0} available in Windows Settings" : "");
-            if (unsuccessful.Count > 0 && IsVisible)
-                UiVisuals.Notice(_owner, "Uninstall results", string.Join("\n\n", unsuccessful)).ShowDialog();
+            if (_closed) return;
+            _status.Text = $"{removed:N0} removed" + (restart > 0 ? $" · {restart:N0} need a restart" : "") +
+                (issues.Count > 0 ? $" · {issues.Count:N0} need attention" : "") +
+                (unavailable > 0 ? $" · {unavailable:N0} unavailable" : "") +
+                (_leftovers.Count > 0 ? $" · {_leftovers.Count:N0} leftovers to review" : "");
+            if (issues.Count > 0 && IsVisible)
+                UiVisuals.Notice(_owner, "Uninstall results", string.Join("\n\n", issues)).ShowDialog();
         }
 
-        private bool Confirm(IEnumerable<string> apps, string label)
+        private bool Confirm(IEnumerable<string> apps, bool deep)
         {
-            var window = new Window { Owner = _owner, Title = "Review uninstall", Width = 570, Height = 390,
+            var window = new Window { Owner = _owner, Title = deep ? "Review deep uninstall" : "Review uninstall", Width = 570, Height = 390,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false, FontFamily = _owner.FontFamily };
             UiVisuals.ThemeCaption(window);
             var surface = new DockPanel { Margin = new Thickness(24) };
-            var heading = Label("Review uninstall", 24, "Ink", true);
+            var heading = Label(window.Title, 24, "Ink", true);
             heading.Margin = new Thickness(0, 0, 0, 14);
             DockPanel.SetDock(heading, Dock.Top);
             surface.Children.Add(heading);
             var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0) };
             var cancel = new Button { Content = "Cancel", IsCancel = true, Margin = new Thickness(0, 0, 7, 0) };
-            var confirm = new Button { Content = label };
+            var confirm = new Button { Content = deep ? "Start deep uninstall" : "Start uninstall" };
             UiVisuals.Emphasize(confirm);
             actions.Children.Add(cancel);
             actions.Children.Add(confirm);
@@ -433,7 +448,9 @@ namespace DiskBubbles
                 item.Margin = new Thickness(0, 0, 0, 10);
                 stack.Children.Add(item);
             }
-            var note = Label("Uninstalling may remove app data. Leftover folders are reviewed separately.", 13, "Muted");
+            var note = Label(deep
+                ? "After uninstall, Disk Bubbles checks for remaining install files, caches, and matching app data. Review any folders before moving them to the Recycle Bin."
+                : "After uninstall, review any verified leftover install folders. The uninstaller may remove app data.", 13, "Muted");
             note.TextWrapping = TextWrapping.Wrap;
             stack.Children.Add(note);
             surface.Children.Add(new ScrollViewer { Content = stack, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
@@ -444,47 +461,53 @@ namespace DiskBubbles
             return window.ShowDialog() == true;
         }
 
-        private async Task RecycleLeftoverAsync()
+        private async Task ReviewLeftoversAsync(IReadOnlyList<AppLeftover> items)
         {
-            if (_writing || _scan != null || !(_list.SelectedItem is AppLeftover leftover)) return;
+            if (_writing || _scan != null) return;
             SetWriting(true);
+            try { await MoveReviewedLeftoversAsync(items); }
+            finally { SetWriting(false); }
+        }
+
+        private async Task MoveReviewedLeftoversAsync(IReadOnlyList<AppLeftover> items)
+        {
+            string pendingStatus = _status.Text;
             try
             {
-                var prepared = await Task.Run(() =>
-                {
-                    if (!IsLeftover(leftover.App, _apps) || SystemProtection.ForPath(leftover.Location) != EntryProtection.None ||
-                        AppInventory.HasOtherRegistration(leftover.Location))
-                        throw new IOException("This folder is in use or managed by Windows.");
-                    var scan = DiskScanner.Scan(leftover.Location, CancellationToken.None);
-                    return RecycleItem.Prepare(Path.GetDirectoryName(leftover.Location), new[] { scan.Root }, CancellationToken.None);
-                });
+                _status.Text = "Verifying leftover folders…";
+                var prepared = await Task.Run(() => AppCleanup.Prepare(items));
                 if (_closed || !IsVisible) return;
-                if (new RecycleReview(_owner, prepared, null, prepared[0].Entry).ShowDialog() != true) return;
-                if (await Task.Run(() => AppInventory.IsRegistered(leftover.App) || AppInventory.HasOtherRegistration(leftover.Location)))
-                    throw new IOException("An installed app now uses this folder. Scan apps again.");
-                if (_closed) return;
-                MovingFiles = true;
-                var moved = await RecycleItem.MoveAsync(prepared);
-                MovingFiles = false;
-                if (moved.Count == 0)
-                    new RecycleReview(_owner, prepared, null, prepared[0].Entry, completed: true).ShowDialog();
-                else
+                if (prepared.Count == 0)
                 {
-                    _storageChanged();
-                    _leftovers.Remove(leftover);
-                    _receipts.RemoveAll(app => string.Equals(app.Location, leftover.Location, StringComparison.OrdinalIgnoreCase));
-                    _status.Text = "Leftover folder moved to the Recycle Bin.";
-                    UpdateList();
+                    UiVisuals.Notice(_owner, "No verified leftovers", "Disk Bubbles couldn’t verify a folder for recycling.").ShowDialog();
+                    return;
                 }
+                if (new RecycleReview(_owner, prepared, null, null).ShowDialog() != true) return;
+
+                var byPath = items.ToDictionary(item => item.Location, StringComparer.OrdinalIgnoreCase);
+                var moved = await RecycleItem.MoveWithCheckAsync(prepared, item =>
+                {
+                    var owner = byPath[item.Path];
+                    if (AppCleanup.IsRegistered(owner.App) || !AppCleanup.IsSafeLocation(owner.Location, owner.App))
+                        throw new IOException("An app or service now uses this folder.");
+                });
+                var incomplete = prepared.Except(moved).ToArray();
+                if (incomplete.Length > 0)
+                    new RecycleReview(_owner, incomplete, null, null, completed: true).ShowDialog();
+                if (moved.Count == 0) return;
+
+                _storageChanged();
+                _leftovers.RemoveAll(leftover => moved.Any(item => string.Equals(item.Path, leftover.Location, StringComparison.OrdinalIgnoreCase)));
+                pendingStatus = $"{moved.Count:N0} leftover folders moved to the Recycle Bin.";
+                UpdateList();
             }
-            catch (Exception error) when (AppInventory.IsRegistryError(error) || error is Win32Exception)
+            catch (Exception error) when (AppInventory.IsRegistryError(error) || error is Win32Exception || error is ArgumentException)
             {
-                if (IsVisible) UiVisuals.Notice(_owner, "Folder stayed in place", error.Message).ShowDialog();
+                if (!_closed && IsVisible) UiVisuals.Notice(_owner, "Cleanup stopped", error.Message).ShowDialog();
             }
             finally
             {
-                MovingFiles = false;
-                SetWriting(false);
+                if (!_closed) _status.Text = pendingStatus;
             }
         }
 

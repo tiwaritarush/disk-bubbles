@@ -85,7 +85,7 @@ namespace DiskBubbles
 
             var content = new Grid();
             content.ColumnDefinitions.Add(new ColumnDefinition());
-            if (!completed)
+            if (!completed && root != null)
             {
                 content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(245) });
                 var preview = new StackPanel { Margin = new Thickness(17, 16, 16, 15) };

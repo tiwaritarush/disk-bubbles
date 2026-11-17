@@ -1,5 +1,11 @@
 # Changelog
 
+## 10.4.0
+
+- Put Uninstall and Deep Uninstall in the App Cleaner details pane and extend both panes into the former footer.
+- Run verified Desktop uninstallers and supported Store removal from App Cleaner.
+- Review confirmed install leftovers after removal. Deep Uninstall also looks for matching app data and caches. Cleanup checks registered apps, services and driver files before recycling.
+
 ## 10.3.8
 
 - Center the toolbar icons in equally sized buttons, with consistent spacing and inset keyboard focus.

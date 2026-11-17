@@ -33,6 +33,8 @@ namespace DiskBubbles
         internal string Key;
         internal string Command;
         internal string DisplayIcon;
+        internal string PackageFamily;
+        internal bool RegisteredLocation;
         internal bool WindowsInstaller;
         internal bool Locked;
         internal string Id => Package ?? $"{Hive}:{View}:{Key}";
@@ -57,7 +59,7 @@ Get-AppxPackage -PackageTypeFilter Main,Bundle | Where-Object { " + StoreFilter 
     $package = $_.Group | Sort-Object IsBundle -Descending | Select-Object -First 1
     $name = $labels[$package.PackageFamilyName]
     if (!$name) { $name = $package.Name }
-    $fields = @($package.PackageFullName, $name, [string]$package.Version, $main.InstallLocation)
+    $fields = @($package.PackageFullName, $name, [string]$package.Version, $main.InstallLocation, $package.PackageFamilyName)
     ($fields | ForEach-Object { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$_)) }) -join [char]9
   }";
         private static readonly RegistryHive[] Hives = { RegistryHive.CurrentUser, RegistryHive.LocalMachine };
@@ -100,10 +102,13 @@ Get-AppxPackage -PackageTypeFilter Main,Bundle | Where-Object { " + StoreFilter 
                 foreach (string row in RunPowerShell(ReadPackages, null, token).Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
                 {
                     string[] fields = row.Split('\t');
-                    if (fields.Length != 4)
+                    if (fields.Length != 5)
                         continue;
                     string[] values = fields.Select(field => Encoding.UTF8.GetString(Convert.FromBase64String(field))).ToArray();
-                    inventory.Apps.Add(new InstalledApp { Package = values[0], Name = values[1], Version = values[2], Location = Normalize(values[3]) });
+                    inventory.Apps.Add(new InstalledApp
+                    {
+                        Package = values[0], Name = values[1], Version = values[2], Location = Normalize(values[3]), PackageFamily = values[4],
+                    });
                 }
             }
             catch (Exception error) when (DiskScanner.IsFileSystemError(error) || error is Win32Exception || error is FormatException)
@@ -172,7 +177,7 @@ Get-AppxPackage -PackageTypeFilter Main,Bundle | Where-Object { " + StoreFilter 
             return registration != null;
         }
 
-        internal static bool HasOtherRegistration(string location)
+        internal static bool HasOtherRegistration(string location, InstalledApp owner)
         {
             foreach (var hive in Hives)
                 foreach (var view in Views)
@@ -186,6 +191,9 @@ Get-AppxPackage -PackageTypeFilter Main,Bundle | Where-Object { " + StoreFilter 
                         using var key = uninstall.OpenSubKey(name);
                         if (key == null)
                             continue;
+                        if (owner.Package == null && Paths.Equals(Convert.ToString(key.GetValue("DisplayName")).Trim(), owner.Name) &&
+                            Paths.Equals(Convert.ToString(key.GetValue("Publisher")).Trim(), owner.Publisher))
+                            return true;
                         string other = Normalize(Convert.ToString(key.GetValue("InstallLocation")))
                             ?? IconLocation(Convert.ToString(key.GetValue("DisplayIcon")));
                         if (other != null && (SystemProtection.IsInside(other, location) || SystemProtection.IsInside(location, other)))
@@ -208,12 +216,14 @@ Get-AppxPackage -PackageTypeFilter Main,Bundle | Where-Object { " + StoreFilter 
                 return null;
 
             string displayIcon = Read("DisplayIcon");
-            string location = Normalize(Read("InstallLocation")) ?? IconLocation(displayIcon);
+            string registered = Normalize(Read("InstallLocation"));
             return new InstalledApp
             {
-                Name = name, Publisher = Read("Publisher"), Version = Read("DisplayVersion"), Location = location,
+                Name = name, Publisher = Read("Publisher"), Version = Read("DisplayVersion"),
+                Location = registered ?? IconLocation(displayIcon), RegisteredLocation = registered != null,
                 Hive = hive, View = view, Key = key, Command = Read("UninstallString"), DisplayIcon = displayIcon,
-                WindowsInstaller = Read("WindowsInstaller") == "1", Locked = Read("NoRemove") == "1",
+                WindowsInstaller = Read("WindowsInstaller") == "1",
+                Locked = Read("NoRemove") == "1" || Read("DriverPackage") == "1" || AppRemoval.IsDriverName(name),
             };
         }
 
@@ -321,7 +331,18 @@ $remaining = Get-AppxPackage -PackageTypeFilter Main,Bundle | Where-Object {$_.P
 if ($remaining) { throw 'The package is still registered.' }
 ", package, token);
 
-        private static string RunPowerShell(string code, string package, CancellationToken token)
+        internal static bool IsPackageFamilyPresent(string family)
+        {
+            string result = RunPowerShell(@"
+if (Get-AppxPackage -PackageTypeFilter Main,Bundle | Where-Object {$_.PackageFamilyName -ceq $env:DISK_BUBBLES_PACKAGE}) { 'present' }
+else { 'absent' }
+", family, CancellationToken.None, catalogQuery: true).Trim();
+            if (result == "present") return true;
+            if (result == "absent") return false;
+            throw new IOException("Windows did not confirm the Store package status.");
+        }
+
+        private static string RunPowerShell(string code, string package, CancellationToken token, bool catalogQuery = false)
         {
             var start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe"),
                 "-NoLogo -NoProfile -NonInteractive -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes("$ErrorActionPreference='Stop';\n" + code)))
@@ -339,7 +360,7 @@ if ($remaining) { throw 'The package is still registered.' }
             var timer = Stopwatch.StartNew();
             while (!process.WaitForExit(80))
             {
-                if (package != null || (!token.IsCancellationRequested && timer.Elapsed < TimeSpan.FromSeconds(18)))
+                if ((package != null && !catalogQuery) || (!token.IsCancellationRequested && timer.Elapsed < TimeSpan.FromSeconds(18)))
                     continue;
                 try { process.Kill(); } catch (InvalidOperationException) { }
                 token.ThrowIfCancellationRequested();
@@ -347,7 +368,7 @@ if ($remaining) { throw 'The package is still registered.' }
             }
             errors.GetAwaiter().GetResult();
             if (process.ExitCode != 0)
-                throw new IOException(package == null ? "Windows did not return the Store catalog." : "Windows could not confirm that this Store app was removed.");
+                throw new IOException(package == null || catalogQuery ? "Windows did not return the Store catalog." : "Windows could not confirm that this Store app was removed.");
             return output.GetAwaiter().GetResult();
         }
     }

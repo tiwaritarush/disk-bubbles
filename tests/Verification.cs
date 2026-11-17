@@ -597,6 +597,7 @@ internal static class Verification
         entryType.GetField("Command", PrivateInstance).SetValue(studio, @"C:\Windows\System32\cmd.exe /c echo forbidden");
         Assert(launcher.Invoke(null, new[] { studio }) == null, "A shell command passed the uninstaller boundary.");
         entryType.GetField("Command", PrivateInstance).SetValue(studio, "MsiExec.exe /I{40F8C74A-E077-47BD-90AC-DC90F04304CD}");
+        VerifyAppCleanupPolicy(assembly, entryType, studio, notes, archive, iconFolder);
         page.GetType().GetField("_loaded", PrivateInstance).SetValue(page, true);
         ((TextBlock)page.GetType().GetField("_status", PrivateInstance).GetValue(page)).Text = "5 installed apps · largest measured first";
         page.GetType().GetMethod("UpdateScanView", PrivateInstance).Invoke(page, null);
@@ -622,25 +623,100 @@ internal static class Verification
         light.Invoke(window, new object[] { false });
         await Capture(window, Path.Combine(fixture, "../app-cleaner-dark.png"));
 
-        var review = (Button)page.GetType().GetField("_review", PrivateInstance).GetValue(page);
+        var uninstall = (Button)page.GetType().GetField("_uninstall", PrivateInstance).GetValue(page);
+        var deepUninstall = (Button)page.GetType().GetField("_deepUninstall", PrivateInstance).GetValue(page);
+        Assert(uninstall.IsVisible && deepUninstall.IsVisible && uninstall.IsEnabled && deepUninstall.IsEnabled,
+            "The selected app did not expose both uninstall actions.");
+        await CloseAppReview(window, uninstall, "Review uninstall", "Start uninstall");
+        await CloseAppReview(window, deepUninstall, "Review deep uninstall", "Start deep uninstall");
+        list.SelectedItem = archive;
+        await CloseAppReview(window, uninstall, "Uninstall unavailable", "Close");
+        disk.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(!page.IsVisible && ((FrameworkElement)WindowField(window, "_browser")).IsVisible &&
+            ((TextBlock)WindowField(window, "_path")).Text == Path.Combine(fixture, "Empty"), "Switching modes discarded the disk scan.");
+        light.Invoke(window, new object[] { true });
+    }
+
+    private static void VerifyAppCleanupPolicy(Assembly assembly, Type app, object desktop, object store, object other, string fixture)
+    {
+        var cleanup = assembly.GetType("DiskBubbles.AppCleanup");
+        var paths = cleanup.GetMethod("Candidates", BindingFlags.Static | BindingFlags.NonPublic);
+        string[] Candidates(object entry, bool deep) => ((IEnumerable)paths.Invoke(null, new[] { entry, deep })).Cast<object>()
+            .Select(item => (string)item.GetType().GetField("Item1").GetValue(item)).ToArray();
+        Assert(Candidates(desktop, false).Length == 0 && Candidates(desktop, true).Length > 0,
+            "The basic uninstall included unregistered folders or the deep scan missed the app data locations.");
+        var family = app.GetField("PackageFamily", PrivateInstance);
+        family.SetValue(store, @"..\Windows");
+        Assert(Candidates(store, true).Length == 0, "A traversal path passed Store app cleanup.");
+        family.SetValue(store, "Example.Notes_0123456789abc");
+        Assert(Candidates(store, false).Length == 0 && Candidates(store, true).Length == 5,
+            "Store cleanup didn't limit its candidates to the named per-user folders.");
+        var command = app.GetField("Command", PrivateInstance);
+        var location = app.GetProperty("Location");
+        var registered = app.GetField("RegisteredLocation", PrivateInstance);
+        var roots = (string[])assembly.GetType("DiskBubbles.AppInventory").GetField("ProgramRoots", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+        string originalRoot = roots[0];
+        string originalLocation = (string)location.GetValue(other);
+        try
+        {
+            string appDirectory = Directory.CreateDirectory(Path.Combine(fixture, "Vendor app")).FullName;
+            string setup = Path.Combine(appDirectory, "setup.exe");
+            File.Copy(assembly.Location, setup);
+            roots[0] = fixture;
+            location.SetValue(other, appDirectory);
+            registered.SetValue(other, true);
+            var launcher = assembly.GetType("DiskBubbles.AppRemoval").GetMethod("DesktopLauncher", BindingFlags.Static | BindingFlags.NonPublic);
+            command.SetValue(other, "\"" + setup + "\" /install");
+            Assert(launcher.Invoke(null, new[] { other }) == null, "Setup was allowed to run without an uninstall action.");
+            command.SetValue(other, "\"" + setup + "\" --uninstall");
+            Assert(launcher.Invoke(null, new[] { other }) != null && Candidates(other, false).SequenceEqual(new[] { appDirectory }),
+                "The registered desktop uninstaller or its dedicated folder wasn't recognized.");
+            var service = cleanup.GetMethod("PointsInside", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert((bool)service.Invoke(null, new object[] { "\"" + setup + "\" --service", appDirectory }),
+                "A service pointing inside the app folder didn't block cleanup.");
+            var scan = assembly.GetType("DiskBubbles.DiskScanner").GetMethods().Single(method => method.Name == "Scan");
+            var treeCheck = cleanup.GetMethod("CanRecycleTree", BindingFlags.Static | BindingFlags.NonPublic);
+            bool SafeTree()
+            {
+                var result = scan.Invoke(null, new object[] { appDirectory, CancellationToken.None, null, 1 });
+                return (bool)treeCheck.Invoke(null, new[] { result.GetType().GetField("Root").GetValue(result) });
+            }
+            Assert(SafeTree(), "A clean disposable folder did not pass the app cleanup policy.");
+            File.WriteAllText(Path.Combine(appDirectory, "test-audio.sys"), "disposable driver-name fixture");
+            Assert(!SafeTree(), "A folder containing driver files passed the app cleanup policy.");
+        }
+        finally
+        {
+            roots[0] = originalRoot;
+            location.SetValue(other, originalLocation);
+            registered.SetValue(other, false);
+            command.SetValue(other, null);
+        }
+    }
+
+    private static async Task CloseAppReview(Window window, Button action, string title, string expectedButton)
+    {
         var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(25) };
         var deadline = DateTime.UtcNow.AddSeconds(3);
         timer.Tick += (sender, args) =>
         {
-            Window modal = Application.Current.Windows.Cast<Window>().FirstOrDefault(item => item.Owner == window && item.IsVisible && item.Title == "Review uninstall");
+            Window modal = Application.Current.Windows.Cast<Window>().FirstOrDefault(item => item.Owner == window && item.IsVisible);
             if (modal == null && DateTime.UtcNow < deadline) return;
             timer.Stop();
-            modal?.Close();
-            completion.SetResult(modal != null);
+            if (modal == null)
+            {
+                completion.SetResult(false);
+                return;
+            }
+            bool matched = modal.Title == title && FindVisual<Button>(modal, button => Equals(button.Content, expectedButton))?.IsEnabled == true;
+            modal.Closed += (closed, args) => completion.SetResult(matched);
+            modal.Close();
         };
         timer.Start();
-        review.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        Assert(await completion.Task, "The uninstall review did not open for a selected app.");
-        disk.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        Assert(!page.IsVisible && ((FrameworkElement)WindowField(window, "_browser")).IsVisible &&
-            ((TextBlock)WindowField(window, "_path")).Text == Path.Combine(fixture, "Empty"), "Switching modes discarded the disk scan.");
-        light.Invoke(window, new object[] { true });
+        action.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(await completion.Task, "App Cleaner did not show " + title + ".");
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
     }
 
     private static string EntryName(object item) => (string)item.GetType().GetProperty("Name").GetValue(item);

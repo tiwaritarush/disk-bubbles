@@ -13,7 +13,7 @@ Windows can tell you that a drive is nearly full. Figuring out which project, do
 - **Scan a drive or folder.** See progress as Windows enumerates the files. You can cancel a scan and return to your previous results.
 - **Explore by size.** Click a folder in the list or on the map to open it. Hover to see its size and share of the current folder. Use the map arrows to see smaller entries, including empty ones. Back and Forward remember your scroll position and map page.
 - **Mark items as you browse.** Check files or folders anywhere in the scan. Use the trash icon at the bottom right to review everything together. The app protects critical Windows locations and verifies file identities before asking Windows to move anything.
-- **Review installed apps.** App Cleaner shows scan progress, then lists desktop and Store apps with their registered icons and measured install sizes where available. Review uninstall actions or check for folders left after a desktop uninstall.
+- **Uninstall apps.** App Cleaner runs supported desktop uninstallers and Store package removal. Use **Uninstall** to check for leftover install folders or **Deep Uninstall** to also look for matching app data and caches. Review the folders before moving them to the Recycle Bin.
 - **Switch between light and dark.** The bubbles catch a pink reflection in the cream theme and a green one in the charcoal theme. The app remembers your choice and follows the Windows animation setting.
 
 ![Disk Bubbles in the cream and ink theme with frosted glass bubbles.](docs/screenshots/light.png)
@@ -27,6 +27,8 @@ Get `DiskBubbles.exe` from the [releases page](https://github.com/tiwaritarush/d
 Start with **Scan drive** or **Open folder**. Press **Enter** on a row to open its folder or reveal its file in File Explorer. Use **Alt+Left**, **Alt+Right**, and **Alt+Up** to navigate. A new scan starts a fresh set of marks.
 
 The map shows logical file sizes. The space a file takes up on disk can differ, especially for compressed, sparse, or hard-linked files. The capacity meter uses the space Windows reports for your account. Scan results stay in memory, and Disk Bubbles sends no telemetry.
+
+App Cleaner leaves protected driver packages and shared components under Windows or vendor control. Cleanup only offers verified user folders. Apps with unsupported removal commands show an explanation in the app.
 
 ## Build from source
 
