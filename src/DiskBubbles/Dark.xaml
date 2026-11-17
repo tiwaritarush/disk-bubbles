@@ -22,6 +22,15 @@
     <GradientStop Offset="0" Color="#101927" />
     <GradientStop Offset="1" Color="#0A1220" />
   </LinearGradientBrush>
+  <LinearGradientBrush x:Key="GlassPane" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Offset="0" Color="#CA192332" />
+    <GradientStop Offset="1" Color="#920C1521" />
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="GlassClear" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Offset="0" Color="#53222D40" />
+    <GradientStop Offset="0.64" Color="#19121D2E" />
+    <GradientStop Offset="1" Color="#44121D2E" />
+  </LinearGradientBrush>
   <LinearGradientBrush x:Key="Raised" StartPoint="0,0" EndPoint="0,1">
     <GradientStop Offset="0" Color="#172334" />
     <GradientStop Offset="1" Color="#101B2B" />

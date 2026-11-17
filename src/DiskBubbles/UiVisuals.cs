@@ -4,7 +4,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 
 namespace DiskBubbles
@@ -21,44 +20,6 @@ namespace DiskBubbles
         public const string Bin = "M 4,7 H 20 M 9,7 V 4 H 15 V 7 M 6,7 L 7,20 H 17 L 18,7 M 10,10 V 17 M 14,10 V 17";
         public const string Sun = "M 12,8 A 4,4 0 1 1 11.99,8 M 12,2 V 4 M 12,20 V 22 M 2,12 H 4 M 20,12 H 22 M 5,5 L 6.5,6.5 M 17.5,17.5 L 19,19 M 5,19 L 6.5,17.5 M 17.5,6.5 L 19,5";
         public const string Moon = "M 19.5,15 A 8,8 0 1 1 9,4.5 A 6.5,6.5 0 0 0 19.5,15 Z";
-
-        private static Brush _darkBlush;
-        private static Brush _lightBlush;
-        private static Brush _darkReflection;
-        private static Brush _lightReflection;
-
-        public static void DrawBlush(DrawingContext drawing, Rect bounds)
-        {
-            if (SystemParameters.HighContrast || bounds.Width <= 0 || bounds.Height <= 0)
-                return;
-
-            Brush blush = Appearance.IsLight ? (_lightBlush ??= BlushBrush(95)) : (_darkBlush ??= BlushBrush(72));
-            drawing.DrawEllipse(blush, null, new Point(bounds.X + bounds.Width * 0.5, bounds.Y + bounds.Height * 0.5),
-                bounds.Width * 0.5, bounds.Height * 0.5);
-        }
-
-        public static void DrawReflection(DrawingContext drawing, Point center, double radius)
-        {
-            if (SystemParameters.HighContrast)
-                return;
-            Brush light = Appearance.IsLight ? (_lightReflection ??= BlushBrush(67, true)) : (_darkReflection ??= BlushBrush(60, true));
-            drawing.DrawEllipse(light, null, center, radius, radius);
-        }
-
-        private static Brush BlushBrush(byte strength, bool reflection = false)
-        {
-            Color tint = ((SolidColorBrush)Application.Current.FindResource("Atmosphere")).Color;
-            var brush = reflection
-                ? new RadialGradientBrush { Center = new Point(0.56, 0.92), GradientOrigin = new Point(0.61, 0.98), RadiusX = 0.6, RadiusY = 0.42 }
-                : new RadialGradientBrush { RadiusX = 0.5, RadiusY = 0.5 };
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb(strength, tint.R, tint.G, tint.B), 0));
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(strength * 0.56), tint.R, tint.G, tint.B), 0.48));
-            if (!reflection)
-                brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(strength * 0.19), tint.R, tint.G, tint.B), 0.82));
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, tint.R, tint.G, tint.B), 1));
-            brush.Freeze();
-            return brush;
-        }
 
         public static FrameworkElement Icon(string geometry, string color, double size = 16)
         {
@@ -160,6 +121,90 @@ namespace DiskBubbles
         private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
     }
 
+    internal sealed class GlassLight
+    {
+        private static GlassLight _light;
+        private static GlassLight _dark;
+        public static GlassLight Current => Appearance.IsLight ? (_light ??= new GlassLight(true)) : (_dark ??= new GlassLight(false));
+
+        private readonly Brush _spread;
+        private readonly Brush _glow;
+        private readonly Brush _core;
+        private readonly Brush _reflection;
+        private readonly Pen _rim;
+
+        private GlassLight(bool light)
+        {
+            Color tint = ((SolidColorBrush)Application.Current.FindResource("Atmosphere")).Color;
+            var middle = new Point(0.5, 0.5);
+            _spread = Fade(tint, middle, 0.5, 0.5, light ? (byte)62 : (byte)51);
+            _glow = Fade(tint, middle, 0.5, 0.5, light ? (byte)74 : (byte)65);
+            _core = Fade(tint, middle, 0.5, 0.5, light ? (byte)68 : (byte)80);
+            _reflection = Fade(tint, new Point(0.51, 0.94), 0.56, 0.28, light ? (byte)57 : (byte)49);
+
+            var rim = new LinearGradientBrush { StartPoint = new Point(0.5, 0), EndPoint = new Point(0.5, 1) };
+            rim.GradientStops.Add(new GradientStop(Alpha(tint, 0), 0.74));
+            rim.GradientStops.Add(new GradientStop(Alpha(tint, 35), 0.91));
+            rim.GradientStops.Add(new GradientStop(Alpha(tint, light ? (byte)145 : (byte)140), 1));
+            _rim = new Pen(rim, 1.45);
+            _rim.Freeze();
+        }
+
+        public void DrawSpread(DrawingContext drawing, Rect bounds, Point origin, bool focused = true)
+        {
+            if (SystemParameters.HighContrast || bounds.IsEmpty || bounds.Width <= 0 || bounds.Height <= 0)
+                return;
+
+            var center = new Point(bounds.X + bounds.Width * origin.X, bounds.Y + bounds.Height * origin.Y);
+            double width = bounds.Width * Math.Min(origin.X, 1 - origin.X);
+            double height = bounds.Height * Math.Min(origin.Y, 1 - origin.Y);
+            drawing.DrawEllipse(_spread, null, center, width, height);
+            if (!focused)
+                return;
+            drawing.DrawEllipse(_glow, null, center, width * 0.92, height * 0.45);
+            drawing.DrawEllipse(_core, null, center, width * 0.76, height * 0.13);
+        }
+
+        public void DrawReflection(DrawingContext drawing, Point center, double radius)
+        {
+            if (SystemParameters.HighContrast || radius < 12)
+                return;
+            drawing.DrawEllipse(_reflection, null, center, radius, radius);
+            double inset = radius - Math.Min(3, radius * 0.07);
+            drawing.DrawEllipse(null, _rim, center, inset, inset);
+        }
+
+        private static Brush Fade(Color tint, Point center, double x, double y, byte strength)
+        {
+            var brush = new RadialGradientBrush { Center = center, GradientOrigin = center, RadiusX = x, RadiusY = y };
+            brush.GradientStops.Add(new GradientStop(Alpha(tint, strength), 0));
+            brush.GradientStops.Add(new GradientStop(Alpha(tint, (byte)(strength * 0.42)), 0.53));
+            brush.GradientStops.Add(new GradientStop(Alpha(tint, 0), 1));
+            brush.Freeze();
+            return brush;
+        }
+
+        private static Color Alpha(Color color, byte alpha) => Color.FromArgb(alpha, color.R, color.G, color.B);
+    }
+
+    internal sealed class GlassBackdrop : FrameworkElement
+    {
+        private static readonly DependencyProperty TintProperty = DependencyProperty.Register("Tint", typeof(Brush), typeof(GlassBackdrop),
+            new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+        private readonly Point _origin;
+        private readonly bool _focused;
+
+        public GlassBackdrop(double x, double y, bool focused = true)
+        {
+            _origin = new Point(x, y);
+            _focused = focused;
+            IsHitTestVisible = false;
+            SetResourceReference(TintProperty, "Atmosphere");
+        }
+
+        protected override void OnRender(DrawingContext drawing) => GlassLight.Current.DrawSpread(drawing, new Rect(RenderSize), _origin, _focused);
+    }
+
     internal static class GlassOrb
     {
         private static readonly Brush Shadow = new RadialGradientBrush(Color.FromArgb(141, 7, 7, 9), Color.FromArgb(0, 7, 7, 9));
@@ -171,7 +216,6 @@ namespace DiskBubbles
             (0.62, 0, 255, 255, 252), (0.83, 30, 255, 255, 252), (0.95, 111, 255, 255, 252), (1, 167, 255, 255, 252));
         private static readonly Brush LightGlint = FrostGradient(new Point(0.25, 0.13), 0.49, 0.28,
             (0, 197, 255, 255, 255), (0.42, 91, 255, 255, 255), (1, 0, 255, 255, 255));
-        private static readonly Lazy<Brush> FrostGrain = new Lazy<Brush>(CreateFrostGrain);
 
         public static void Draw(DrawingContext drawing, Point center, double radius, Color tone)
         {
@@ -192,7 +236,6 @@ namespace DiskBubbles
             body.GradientStops.Add(new GradientStop(Tint(tone, 0.09, 178), 0.75));
             body.GradientStops.Add(new GradientStop(Tint(tone, 0.22, 211), 1));
             drawing.DrawEllipse(body, null, center, radius, radius);
-            UiVisuals.DrawReflection(drawing, center, radius);
 
             if (radius >= 20)
             {
@@ -235,6 +278,7 @@ namespace DiskBubbles
                 DrawArc(drawing, center, inner, -142, -79, Color.FromArgb(136, 245, 245, 250), Alpha(tone, 30), 0.95);
                 DrawArc(drawing, center, inner, 33, 107, Alpha(tone, 153), Alpha(tone, 28), 1.15);
             }
+            GlassLight.Current.DrawReflection(drawing, center, radius);
         }
 
         private static void DrawLight(DrawingContext drawing, Point center, double radius, Color tone)
@@ -253,10 +297,8 @@ namespace DiskBubbles
                 refraction.GradientStops.Add(new GradientStop(Alpha(tone, 48), 0.52));
                 refraction.GradientStops.Add(new GradientStop(Alpha(tone, 0), 1));
                 drawing.DrawEllipse(refraction, null, center, radius, radius);
-                UiVisuals.DrawReflection(drawing, center, radius);
                 drawing.DrawEllipse(LightRimFrost, null, center, radius, radius);
                 drawing.DrawEllipse(LightGlint, null, center, radius, radius);
-                drawing.DrawEllipse(FrostGrain.Value, null, center, radius - 0.9, radius - 0.9);
             }
 
             var edge = new LinearGradientBrush { StartPoint = new Point(0.13, 0), EndPoint = new Point(0.85, 1) };
@@ -272,6 +314,7 @@ namespace DiskBubbles
                 DrawArc(drawing, center, inner, -156, -68, Colors.White, Color.FromArgb(13, 255, 255, 255), 2.15);
                 DrawArc(drawing, center, inner, 26, 116, Color.FromArgb(202, 255, 255, 251), Color.FromArgb(13, 255, 255, 251), 1.65);
             }
+            GlassLight.Current.DrawReflection(drawing, center, radius);
         }
 
         private static RadialGradientBrush FrostGradient(Point origin, double radiusX, double radiusY,
@@ -282,28 +325,6 @@ namespace DiskBubbles
                 brush.GradientStops.Add(new GradientStop(Color.FromArgb(stop.Alpha, stop.Red, stop.Green, stop.Blue), stop.Offset));
             brush.Freeze();
             return brush;
-        }
-
-        private static Brush CreateFrostGrain()
-        {
-            const int size = 96;
-            var random = new Random(84);
-            var pixels = new byte[size * size * 4];
-            for (int index = 0; index < pixels.Length; index += 4)
-            {
-                byte shade = random.Next(3) == 0 ? (byte)118 : (byte)255;
-                pixels[index] = shade;
-                pixels[index + 1] = shade;
-                pixels[index + 2] = shade;
-                pixels[index + 3] = (byte)random.Next(1, 11);
-            }
-            var tile = BitmapSource.Create(size, size, 96, 96, PixelFormats.Bgra32, null, pixels, size * 4);
-            var grain = new ImageBrush(tile)
-            {
-                Viewport = new Rect(0, 0, size, size), ViewportUnits = BrushMappingMode.Absolute, TileMode = TileMode.Tile,
-            };
-            grain.Freeze();
-            return grain;
         }
 
         private static void DrawArc(DrawingContext drawing, Point center, double radius, double fromAngle, double toAngle,
@@ -346,9 +367,9 @@ namespace DiskBubbles
             drawing.PushTransform(new TranslateTransform((ActualWidth - width * scale) / 2, (ActualHeight - height * scale) / 2));
             drawing.PushTransform(new ScaleTransform(scale, scale));
 
-            UiVisuals.DrawBlush(drawing, new Rect(0, 0, width, height));
-            Color lens = Appearance.IsLight ? Color.FromRgb(189, 174, 174) : Color.FromRgb(159, 186, 201);
-            Color smallLens = Appearance.IsLight ? Color.FromRgb(184, 176, 165) : Color.FromRgb(162, 175, 191);
+            GlassLight.Current.DrawSpread(drawing, new Rect(0, 0, width, height), new Point(0.5, 0.69));
+            Color lens = Appearance.IsLight ? Color.FromRgb(181, 180, 185) : Color.FromRgb(159, 186, 201);
+            Color smallLens = Appearance.IsLight ? Color.FromRgb(175, 174, 177) : Color.FromRgb(162, 175, 191);
             GlassOrb.Draw(drawing, center, 52, lens);
             GlassOrb.Draw(drawing, center + new Vector(-73, -23), 19, smallLens);
             GlassOrb.Draw(drawing, center + new Vector(73, -23), 19, smallLens);

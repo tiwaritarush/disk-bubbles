@@ -1,5 +1,10 @@
 # Changelog
 
+## 10.3.3
+
+- Use cream for the light workspace and ink for primary controls and folder icons.
+- Give the storage map and App Cleaner translucent panes and turn the pink and green tint into a soft reflection along the glass.
+
 ## 10.3.2
 
 - Spread the pink and green blushes across the storage map and reflect them in the glass.

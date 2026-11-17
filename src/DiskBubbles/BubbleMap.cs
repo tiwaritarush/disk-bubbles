@@ -95,15 +95,14 @@ namespace DiskBubbles
         private static readonly Brush FolderTab = new SolidColorBrush(Color.FromRgb(137, 159, 180));
         private static readonly Brush FileFill = new LinearGradientBrush(Color.FromRgb(232, 238, 242), Color.FromRgb(160, 177, 190), 90);
         private static readonly Brush FoldFill = new SolidColorBrush(Color.FromRgb(136, 158, 176));
-        private static readonly Brush LightFolderFill = new LinearGradientBrush(Color.FromRgb(91, 79, 69), Color.FromRgb(43, 37, 32), 90);
-        private static readonly Brush LightFileFill = new LinearGradientBrush(Color.FromRgb(109, 93, 81), Color.FromRgb(58, 48, 42), 90);
-        private static readonly Brush LightIconTab = new SolidColorBrush(Color.FromRgb(106, 91, 77));
+        private static readonly Brush LightFolderFill = new LinearGradientBrush(Color.FromRgb(49, 47, 46), Color.FromRgb(5, 5, 5), 90);
+        private static readonly Brush LightFileFill = new LinearGradientBrush(Color.FromRgb(65, 62, 59), Color.FromRgb(22, 21, 20), 90);
+        private static readonly Brush LightIconTab = new SolidColorBrush(Color.FromRgb(76, 72, 69));
         private static readonly Color FolderGlass = Color.FromRgb(159, 186, 201);
         private static readonly Color FileGlass = Color.FromRgb(162, 175, 191);
-        private static readonly Color LightFolderGlass = Color.FromRgb(189, 174, 174);
-        private static readonly Color LightFileGlass = Color.FromRgb(184, 176, 165);
+        private static readonly Color LightFolderGlass = Color.FromRgb(181, 180, 185);
+        private static readonly Color LightFileGlass = Color.FromRgb(175, 174, 177);
         private static readonly Brush PressShade = new SolidColorBrush(Color.FromArgb(58, 9, 10, 13));
-        private static readonly Brush LightWash = Glow(Color.FromArgb(42, 255, 255, 255), 0.64, 0.50);
         private static readonly Brush DarkReflection = Glow(Color.FromArgb(70, 226, 238, 255), 0.5, 0.5);
         private static readonly Brush LightReflection = Glow(Color.FromArgb(106, 255, 255, 255), 0.5, 0.5);
 
@@ -455,11 +454,7 @@ namespace DiskBubbles
 
         protected override void OnRender(DrawingContext drawing)
         {
-            var bounds = new Rect(RenderSize);
-            drawing.DrawRectangle(Brushes.Transparent, null, bounds);
-            if (Appearance.IsLight)
-                drawing.DrawRectangle(LightWash, null, bounds);
-            UiVisuals.DrawBlush(drawing, bounds);
+            drawing.DrawRectangle(Brushes.Transparent, null, new Rect(RenderSize));
         }
 
         private static Brush Glow(Color color, double radiusX, double radiusY)

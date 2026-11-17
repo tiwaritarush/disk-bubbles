@@ -166,13 +166,17 @@ namespace DiskBubbles
             var panels = new Grid();
             panels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 278, MaxWidth = 384 });
             panels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2.32, GridUnitType.Star) });
+            var reflection = new GlassBackdrop(0.60, 0.69);
+            Grid.SetColumnSpan(reflection, 2);
+            panels.Children.Add(reflection);
             var itemPanel = UiVisuals.Surface(new Border
             {
                 BorderThickness = new Thickness(0, 0, 1, 0),
                 CornerRadius = new CornerRadius(15, 0, 0, 15), Child = BuildEntries(),
-            }, "Panel", "Line");
+            }, "GlassPane", "Line");
             panels.Children.Add(itemPanel);
-            var storageMap = BuildMap();
+            var storageMap = UiVisuals.Surface(new Border { Child = BuildMap(),
+                CornerRadius = new CornerRadius(0, 15, 15, 0) }, "GlassClear");
             Grid.SetColumn(storageMap, 1);
             panels.Children.Add(storageMap);
             var workspace = Card(panels, "Chart");

@@ -1,59 +1,58 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <SolidColorBrush x:Key="Ink" Color="#050505" />
-  <SolidColorBrush x:Key="Muted" Color="#4D473F" />
-  <SolidColorBrush x:Key="Subtle" Color="#675E53" />
-  <SolidColorBrush x:Key="Line" Color="#CBBFAF" />
+  <SolidColorBrush x:Key="Muted" Color="#433E3A" />
+  <SolidColorBrush x:Key="Subtle" Color="#635B55" />
+  <SolidColorBrush x:Key="Line" Color="#C8C0B6" />
   <SolidColorBrush x:Key="Base" Color="#ECE6DC" />
   <SolidColorBrush x:Key="Atmosphere" Color="#E65BC4" />
-  <SolidColorBrush x:Key="Accent" Color="#28231E" />
-  <SolidColorBrush x:Key="AccentInk" Color="#F9F4EB" />
+  <SolidColorBrush x:Key="Accent" Color="#050505" />
+  <SolidColorBrush x:Key="AccentInk" Color="#ECE6DC" />
+  <SolidColorBrush x:Key="AccentFill" Color="#050505" />
+  <SolidColorBrush x:Key="Workspace" Color="#ECE6DC" />
+  <SolidColorBrush x:Key="Chart" Color="#ECE6DC" />
   <SolidColorBrush x:Key="Attention" Color="#793D29" />
-  <LinearGradientBrush x:Key="AccentFill" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Offset="0" Color="#3B332B" />
-    <GradientStop Offset="1" Color="#25211C" />
-  </LinearGradientBrush>
   <LinearGradientBrush x:Key="GlassEdge" StartPoint="0,0" EndPoint="0.8,1">
-    <GradientStop Offset="0" Color="#B9AB98" />
-    <GradientStop Offset="0.51" Color="#D3C7B7" />
-    <GradientStop Offset="1" Color="#D4C9BA" />
+    <GradientStop Offset="0" Color="#FFFDF8" />
+    <GradientStop Offset="0.45" Color="#DAD3C9" />
+    <GradientStop Offset="1" Color="#C0B7AD" />
   </LinearGradientBrush>
   <LinearGradientBrush x:Key="Panel" StartPoint="0,0" EndPoint="0.72,1">
-    <GradientStop Offset="0" Color="#F8F2E9" />
-    <GradientStop Offset="1" Color="#F2EBE0" />
+    <GradientStop Offset="0" Color="#FAF7F1" />
+    <GradientStop Offset="1" Color="#F0EAE3" />
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="GlassPane" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Offset="0" Color="#AEFFFEFA" />
+    <GradientStop Offset="1" Color="#64FFFDFB" />
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="GlassClear" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Offset="0" Color="#5CFFFEFA" />
+    <GradientStop Offset="0.63" Color="#13FFFDFB" />
+    <GradientStop Offset="1" Color="#44FFFDFB" />
   </LinearGradientBrush>
   <LinearGradientBrush x:Key="Raised" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Offset="0" Color="#FCF6ED" />
-    <GradientStop Offset="1" Color="#E9DFD1" />
+    <GradientStop Offset="0" Color="#FFFCF7" />
+    <GradientStop Offset="1" Color="#ECE6DC" />
   </LinearGradientBrush>
   <LinearGradientBrush x:Key="Header" StartPoint="0,0" EndPoint="1,1">
-    <GradientStop Offset="0" Color="#F5EFE5" />
+    <GradientStop Offset="0" Color="#F6F1E9" />
     <GradientStop Offset="1" Color="#ECE6DC" />
   </LinearGradientBrush>
-  <LinearGradientBrush x:Key="Workspace" StartPoint="0,0" EndPoint="0.93,1">
-    <GradientStop Offset="0" Color="#F1EBE2" />
-    <GradientStop Offset="1" Color="#ECE6DC" />
-  </LinearGradientBrush>
-  <RadialGradientBrush x:Key="Chart" Center="0.42,0.48" GradientOrigin="0.33,0.43" RadiusX="0.83" RadiusY="0.88">
-    <GradientStop Offset="0" Color="#F7F0E5" />
-    <GradientStop Offset="0.57" Color="#ECE6DC" />
-    <GradientStop Offset="1" Color="#E8DFD2" />
-  </RadialGradientBrush>
 
-  <SolidColorBrush x:Key="TooltipFill" Color="#FCF7EE" />
-  <SolidColorBrush x:Key="TooltipEdge" Color="#A69A89" />
-  <SolidColorBrush x:Key="MenuHover" Color="#E9DFD0" />
-  <SolidColorBrush x:Key="ScrollThumb" Color="#8C7E6B" />
-  <SolidColorBrush x:Key="ScrollHover" Color="#756A5D" />
-  <SolidColorBrush x:Key="RowHover" Color="#EFE6D9" />
-  <SolidColorBrush x:Key="RowLinked" Color="#EDE3D2" />
-  <SolidColorBrush x:Key="RowSelected" Color="#E4D8C7" />
-  <SolidColorBrush x:Key="RowSelectedEdge" Color="#826E56" />
-  <SolidColorBrush x:Key="FileGlyph" Color="#574D42" />
-  <SolidColorBrush x:Key="FolderGlyph" Color="#3F3730" />
+  <SolidColorBrush x:Key="TooltipFill" Color="#FCF8F2" />
+  <SolidColorBrush x:Key="TooltipEdge" Color="#A69D94" />
+  <SolidColorBrush x:Key="MenuHover" Color="#E7E0D8" />
+  <SolidColorBrush x:Key="ScrollThumb" Color="#847B73" />
+  <SolidColorBrush x:Key="ScrollHover" Color="#6E655E" />
+  <SolidColorBrush x:Key="RowHover" Color="#ECE6DC" />
+  <SolidColorBrush x:Key="RowLinked" Color="#E6DDD5" />
+  <SolidColorBrush x:Key="RowSelected" Color="#DFD7CF" />
+  <SolidColorBrush x:Key="RowSelectedEdge" Color="#796E66" />
+  <SolidColorBrush x:Key="FileGlyph" Color="#43403C" />
+  <SolidColorBrush x:Key="FolderGlyph" Color="#050505" />
   <SolidColorBrush x:Key="BadgeFill" Color="#F0DFCB" />
   <SolidColorBrush x:Key="BadgeEdge" Color="#AF8E71" />
   <SolidColorBrush x:Key="BadgeInk" Color="#633D23" />
-  <SolidColorBrush x:Key="LogoFill" Color="#E0D5C4" />
-  <SolidColorBrush x:Key="LogoEdge" Color="#554A3D" />
+  <SolidColorBrush x:Key="LogoFill" Color="#ECE6DC" />
+  <SolidColorBrush x:Key="LogoEdge" Color="#050505" />
 </ResourceDictionary>
