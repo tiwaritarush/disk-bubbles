@@ -30,6 +30,7 @@ namespace DiskBubbles
         public string SizeLabel => FormatSize(Bytes);
         public bool IsSystem => IsFolder && (Protection & EntryProtection.CriticalFolder) != 0;
         public bool CanRecycle => Protection == EntryProtection.None;
+        public string MarkHint => CanRecycle ? "Mark for cleanup" : SystemProtection.Reason(this);
         public bool IsMarked
         {
             get => _marked;
@@ -52,6 +53,8 @@ namespace DiskBubbles
         }
         public event PropertyChangedEventHandler PropertyChanged;
         public string AccessibleName => Name + ", " + SizeLabel + (IsSystem ? ", critical Windows folder" : "");
+        /// <summary>Broad content kind used for the subtle colour inside bubbles and list glyphs.</summary>
+        public string Kind => IsFolder ? "Folder" : FileKinds.Of(Name);
         internal EntryProtection Protection { get; set; }
         internal List<DiskEntry> Children { get; }
 
@@ -74,6 +77,33 @@ namespace DiskBubbles
                 unit++;
             }
             return value.ToString(unit == 0 ? "N0" : "0.#") + " " + SizeUnits[unit];
+        }
+    }
+
+    internal static class FileKinds
+    {
+        public static readonly string[] All = { "Folder", "Video", "Image", "Audio", "Archive", "App", "Document", "Other" };
+        private static readonly Dictionary<string, string> ByExtension = Build(
+            ("Video", "mp4 mkv mov avi wmv webm m4v flv mpg mpeg ts mts m2ts 3gp vob"),
+            ("Image", "jpg jpeg png gif bmp tif tiff webp heic heif raw cr2 cr3 nef arw dng psd svg ico avif"),
+            ("Audio", "mp3 wav flac aac m4a ogg oga wma opus aiff alac mid midi"),
+            ("Archive", "zip rar 7z tar gz tgz bz2 xz zst iso img vhd vhdx vmdk qcow2 cab wim esd dmg msi msix msixbundle appx appxbundle"),
+            ("App", "exe dll sys ocx msp jar apk pak bin dat db sqlite node pdb lib obj"),
+            ("Document", "pdf doc docx xls xlsx ppt pptx txt md csv rtf odt ods odp epub log json xml html htm"));
+
+        public static string Of(string name)
+        {
+            int dot = name.LastIndexOf('.');
+            return dot > 0 && dot < name.Length - 1 && ByExtension.TryGetValue(name.Substring(dot + 1), out string kind) ? kind : "Other";
+        }
+
+        private static Dictionary<string, string> Build(params (string Kind, string Extensions)[] groups)
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (kind, extensions) in groups)
+                foreach (string extension in extensions.Split(' '))
+                    map[extension] = kind;
+            return map;
         }
     }
 
