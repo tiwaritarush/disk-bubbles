@@ -12,6 +12,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using Forms = System.Windows.Forms;
 using IOPath = System.IO.Path;
@@ -98,7 +99,7 @@ namespace DiskBubbles
             TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
             UiVisuals.ThemeCaption(this);
 
-            _appCleaner = new AppCleanerPage(this, OpenExplorer, () =>
+            _appCleaner = new AppCleanerPage(this, async path => await OpenExplorerPathAsync(path, true), () =>
             {
                 if (_result == null) return;
                 _result.NeedsRefresh = true;
@@ -630,7 +631,7 @@ namespace DiskBubbles
                 ToolTip = entry.CanRecycle ? "Move this item to the Recycle Bin" : SystemProtection.Reason(entry) };
             delete.Click += async (sender, args) => await RecycleAsync(new[] { target }, review: false);
             var open = new MenuItem { Header = "Open in Explorer", ToolTip = path };
-            open.Click += (sender, args) => OpenExplorer(entry.IsFolder ? "\"" + path + "\"" : "/select,\"" + path + "\"");
+            open.Click += async (sender, args) => await OpenExplorerPathAsync(path, entry.IsFolder);
             var menu = new ContextMenu { PlacementTarget = _map, Placement = PlacementMode.MousePoint, FontSize = 14 };
             menu.Items.Add(select);
             menu.Items.Add(delete);
@@ -638,10 +639,21 @@ namespace DiskBubbles
             return menu;
         }
 
-        private void OpenFileInExplorer(DiskEntry entry)
+        private async void OpenFileInExplorer(DiskEntry entry)
         {
             if (NativeDirectoryReader.IsEntryName(entry.Name))
-                OpenExplorer("/select,\"" + IOPath.Combine(CurrentPath(), entry.Name) + "\"");
+                await OpenExplorerPathAsync(IOPath.Combine(CurrentPath(), entry.Name), false);
+        }
+
+        private async Task OpenExplorerPathAsync(string path, bool folder)
+        {
+            try { await ExplorerShell.OpenAsync(path, folder, new WindowInteropHelper(this).Handle); }
+            catch (Exception error) when (DiskScanner.IsFileSystemError(error) || error is ArgumentException ||
+                error is System.ComponentModel.Win32Exception || error is System.Runtime.InteropServices.COMException)
+            {
+                if (!_closed)
+                    UiVisuals.Notice(this, "Can’t open this location", path + "\n\n" + error.Message).ShowDialog();
+            }
         }
 
         private void OpenExplorer(string arguments)

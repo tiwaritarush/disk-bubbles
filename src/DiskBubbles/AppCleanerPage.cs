@@ -84,7 +84,7 @@ namespace DiskBubbles
             _openFolder.Click += (sender, args) =>
             {
                 string location = SelectedLocation();
-                if (location != null && Directory.Exists(location)) _openExplorer("\"" + location + "\"");
+                if (location != null) _openExplorer(location);
             };
             _uninstall.Click += async (sender, args) => await ReviewUninstallAsync(deep: false);
             _deepUninstall.Click += async (sender, args) => await ReviewUninstallAsync(deep: true);

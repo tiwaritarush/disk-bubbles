@@ -27,6 +27,8 @@ internal static class Verification
             { "Projects/Design Sources/scene.bin", 42000000 }, { "Projects/Archive/sprint.zip", 11400000 },
             { "Projects/Build Assets/installer.msi", 5000000 }, { "Videos/raw-footage.mp4", 36000000 },
             { "Downloads/offline-installer.msi", 18600000 }, { "Backups/backup.zip", 10100000 },
+            { "Downloads/desktop.ini", 32 },
+            { "Downloads/Drafts, 2026 Ω/report & budget.txt", 7 },
             { "Libraries/reference.db", 5200000 }, { "Exports/concept.png", 4900000 },
             { "Photos/poster.psd", 4500000 }, { "Cache/texture.cache", 2500000 },
             { "Desktop/demo.mp4", 2000000 }, { "Firmware/device.img", 1300000 },
@@ -45,6 +47,8 @@ internal static class Verification
                 file.SetLength(item.Value);
         }
         File.SetAttributes(Path.Combine(fixture, "System data.bin"), FileAttributes.System);
+        File.SetAttributes(Path.Combine(fixture, "Downloads", "desktop.ini"), FileAttributes.System | FileAttributes.Hidden);
+        File.SetAttributes(Path.Combine(fixture, "Downloads"), File.GetAttributes(Path.Combine(fixture, "Downloads")) | FileAttributes.System);
 
         var assembly = Assembly.LoadFrom(Path.GetFullPath(args[0]));
         var application = (Application)assembly.GetType("DiskBubbles.App")
@@ -98,10 +102,12 @@ internal static class Verification
                 var actualProtection = forPath.Invoke(null, new object[] { realWindows, File.GetAttributes(realWindows) });
                 var innerProtection = forPath.Invoke(null, new object[] { Environment.SystemDirectory, FileAttributes.Directory });
                 var inherited = assembly.GetType("DiskBubbles.SystemProtection").GetMethod("ForEntry")
-                    .Invoke(null, new object[] { actualProtection, FileAttributes.Directory });
+                    .Invoke(null, new object[] { actualProtection, FileAttributes.Directory, "System32" });
                 Assert(actualProtection.ToString().Contains("CriticalFolder") && !innerProtection.ToString().Contains("CriticalFolder") &&
                     innerProtection.ToString().Contains("System") && inherited.ToString() == "System",
                     "The Windows root or its descendant was mislabeled.");
+                var markedRoot = forPath.Invoke(null, new object[] { Path.Combine(Path.GetPathRoot(realWindows), "System-marked root"), FileAttributes.System | FileAttributes.Directory });
+                Assert(markedRoot.ToString().Contains("System"), "An unfamiliar system-managed root folder lost protection.");
                 protection.SetValue(windows, actualProtection);
                 var map = (FrameworkElement)WindowField(window, "_map");
                 var changed = Array.CreateInstance(entryType, 1);
@@ -136,6 +142,8 @@ internal static class Verification
                 capacityLabel.Text = previousCapacity;
                 capacityMeter.Value = previousMeter;
                 long expected = files.Values.Sum();
+                var downloads = entries.Items.Cast<object>().Single(item => EntryName(item) == "Downloads");
+                Assert((bool)entryType.GetProperty("CanRecycle").GetValue(downloads), "Downloads was blocked by folder-customization metadata.");
                 VerifyScanWorkers(assembly, fixture);
                 Assert((long)root.GetType().GetProperty("Bytes").GetValue(root) == expected, "File sizes did not match the fixture.");
                 Assert((long)result.GetType().GetField("Files").GetValue(result) == files.Count, "File count differed.");
@@ -171,6 +179,11 @@ internal static class Verification
                 Assert((bool)recycleItem.GetProperty("Ready").GetValue(prepared[0]), "Normal file could not be reviewed.");
                 Assert(!(bool)recycleItem.GetProperty("Ready").GetValue(prepared[1]), "System file was eligible to recycle.");
                 Assert(!(bool)recycleItem.GetProperty("Ready").GetValue(prepared[2]), "The critical folder was eligible to recycle.");
+                var downloadSelection = Array.CreateInstance(entryType, 1);
+                downloadSelection.SetValue(downloads, 0);
+                var downloadReview = (IList)prepare.Invoke(null, new object[] { fixture, downloadSelection, CancellationToken.None });
+                Assert((bool)recycleItem.GetProperty("Ready").GetValue(downloadReview[0]), "Downloads customization metadata failed the final deletion check.");
+                VerifyExplorerTargets(assembly, fixture);
                 var reviewType = assembly.GetType("DiskBubbles.RecycleReview");
                 var review = (Window)Activator.CreateInstance(reviewType, window, prepared, root, root, false);
                 review.WindowStartupLocation = WindowStartupLocation.Manual;
@@ -713,6 +726,38 @@ internal static class Verification
             registered.SetValue(other, false);
             command.SetValue(other, null);
         }
+    }
+
+    private static void VerifyExplorerTargets(Assembly assembly, string fixture)
+    {
+        var shell = assembly.GetType("DiskBubbles.ExplorerShell");
+        Assert(shell != null, "Explorer still depends on command-line path parsing.");
+        var resolve = shell.GetMethod("Resolve", BindingFlags.Static | BindingFlags.NonPublic);
+        string directory = Path.Combine(fixture, "Downloads", "Drafts, 2026 Ω");
+        string file = Path.Combine(directory, "report & budget.txt");
+        foreach (var item in new[] { (Path: directory + "\\", Folder: true), (Path: file, Folder: false) })
+        {
+            using (var target = (IDisposable)resolve.Invoke(null, new object[] { item.Path, item.Folder }))
+            {
+                string nativePath = (string)target.GetType().GetProperty("Path", PrivateInstance).GetValue(target);
+                Assert(string.Equals(nativePath, item.Path.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) &&
+                    (bool)target.GetType().GetProperty("IsFolder", PrivateInstance).GetValue(target) == item.Folder,
+                    "The Windows Shell resolved another folder or filename.");
+            }
+        }
+        string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+        if (Directory.Exists(downloads))
+        {
+            using (var target = (IDisposable)resolve.Invoke(null, new object[] { downloads, true }))
+                Assert(string.Equals((string)target.GetType().GetProperty("Path", PrivateInstance).GetValue(target), downloads, StringComparison.OrdinalIgnoreCase),
+                    "The actual Downloads folder resolved to another Shell location.");
+        }
+        try
+        {
+            using (var target = (IDisposable)resolve.Invoke(null, new object[] { Path.Combine(directory, "missing.txt"), false })) { }
+            Assert(false, "A missing Explorer target silently fell back to Home.");
+        }
+        catch (TargetInvocationException error) { Assert(error.InnerException is IOException, "A missing target reported an unexpected error."); }
     }
 
     private static async Task VerifyBubbleMenu(Window window, FrameworkElement map, ListBox entries, string folder)

@@ -24,8 +24,8 @@ namespace DiskBubbles
                     throw new Win32Exception(Marshal.GetLastWin32Error());
 
                 var attributes = (FileAttributes)info.Attributes;
-                if ((attributes & (FileAttributes.System | FileAttributes.ReparsePoint)) != 0)
-                    throw new IOException("Windows identifies this as a system item or filesystem link.");
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    throw new IOException("This item is a filesystem link. Open its actual location to choose files.");
                 if (entry.IsFolder != ((attributes & FileAttributes.Directory) != 0))
                     throw new IOException("The item type changed. Rescan this folder to review it.");
                 if (!entry.IsFolder && entry.Bytes != (long)(((ulong)info.SizeHigh << 32) | info.SizeLow))
@@ -46,7 +46,7 @@ namespace DiskBubbles
                     fullPath = fullPath.Substring(4);
                 if (!IsSelectedPath(path, fullPath))
                     throw new IOException("This location resolves through a link or alias. Scan the actual folder to review it.");
-                if (SystemProtection.ForPath(fullPath) != EntryProtection.None)
+                if (SystemProtection.ForEntry(SystemProtection.ForPath(fullPath, attributes), attributes, entry.Name) != EntryProtection.None)
                     throw new IOException("This location is protected.");
 
                 const int fileIdInfo = 18;

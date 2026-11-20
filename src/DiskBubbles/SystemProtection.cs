@@ -71,12 +71,19 @@ namespace DiskBubbles
                 if (IsInside(path, folder))
                     return EntryProtection.Managed;
 
+            if (root.Equals(WindowsDrive, StringComparison.OrdinalIgnoreCase) &&
+                path.TrimEnd('\\').LastIndexOf('\\') == root.Length - 1 &&
+                (attributes & (FileAttributes.System | FileAttributes.Directory)) == (FileAttributes.System | FileAttributes.Directory))
+                return EntryProtection.System;
+
             return EntryProtection.None;
         }
 
-        public static EntryProtection ForEntry(EntryProtection folder, FileAttributes attributes) =>
+        public static EntryProtection ForEntry(EntryProtection folder, FileAttributes attributes, string name) =>
             (folder & (EntryProtection.System | EntryProtection.Managed)) |
-            ((attributes & FileAttributes.System) != 0 ? EntryProtection.System : EntryProtection.None);
+            ((attributes & FileAttributes.System) != 0 && (attributes & FileAttributes.Directory) == 0 &&
+                !name.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase) && !name.Equals("Thumbs.db", StringComparison.OrdinalIgnoreCase)
+                ? EntryProtection.System : EntryProtection.None);
 
         public static bool IsInside(string path, string folder) => !string.IsNullOrEmpty(folder) &&
             (path.Equals(folder, StringComparison.OrdinalIgnoreCase) ||
@@ -87,12 +94,12 @@ namespace DiskBubbles
             if (item.IsSystem)
                 return "Critical Windows folder";
             if ((item.Protection & EntryProtection.System) != 0)
-                return "Protected Windows item";
+                return item.IsFolder ? "Windows marks this root folder as system-managed" : "Windows marked this as a system file";
             if ((item.Protection & EntryProtection.Managed) != 0)
-                return "Windows-managed location";
+                return "Managed app location. Use App Cleaner to uninstall it";
             if ((item.Protection & EntryProtection.Incomplete) != 0)
-                return "Folder contains entries the scan skipped";
-            return "Folder contains protected or unscanned items";
+                return "Some contents could not be scanned. Open this folder to choose individual items";
+            return "Contains protected or unscanned items. Open this folder to choose individual items";
         }
     }
 }

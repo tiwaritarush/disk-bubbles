@@ -111,7 +111,7 @@ namespace DiskBubbles
             {
                 FileAttributes attributes = root.Attributes;
                 result.Root.Protection = SystemProtection.ForPath(root.FullName, attributes) |
-                    SystemProtection.ForEntry(result.Root.Protection, attributes);
+                    SystemProtection.ForEntry(result.Root.Protection, attributes, root.Name);
             }
             catch (Exception error) when (IsFileSystemError(error))
             {
@@ -230,7 +230,7 @@ namespace DiskBubbles
                     else
                     {
                         string path = needsPath ? Path.Combine(folder.Path, name) : null;
-                        EntryProtection protection = SystemProtection.ForEntry(folder.Entry.Protection, attributes);
+                        EntryProtection protection = SystemProtection.ForEntry(folder.Entry.Protection, attributes, name);
                         if (folder.IsVolumeRoot)
                             protection |= SystemProtection.ForPath(path, attributes);
 
