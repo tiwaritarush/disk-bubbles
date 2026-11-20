@@ -7,9 +7,9 @@ using System.Windows;
 [assembly: AssemblyTitle("Disk Bubbles")]
 [assembly: AssemblyProduct("Disk Bubbles")]
 [assembly: AssemblyDescription("Interactive disk usage map for Windows")]
-[assembly: AssemblyVersion("10.5.1.0")]
-[assembly: AssemblyFileVersion("10.5.1.0")]
-[assembly: AssemblyInformationalVersion("10.5.1")]
+[assembly: AssemblyVersion("11.0.0.0")]
+[assembly: AssemblyFileVersion("11.0.0.0")]
+[assembly: AssemblyInformationalVersion("11.0.0")]
 [assembly: TargetFramework(".NETFramework,Version=v4.8")]
 
 namespace DiskBubbles

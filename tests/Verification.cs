@@ -161,16 +161,16 @@ internal static class Verification
                     "The badge template did not recognize the critical folder boundary.");
                 var recycleItem = assembly.GetType("DiskBubbles.RecycleItem");
                 var prepare = recycleItem.GetMethod("Prepare", BindingFlags.Static | BindingFlags.NonPublic);
-                var move = recycleItem.GetMethod("MoveAsync", BindingFlags.Static | BindingFlags.NonPublic);
-                var shellRecycle = assembly.GetType("DiskBubbles.ShellRecycle");
-                var readSnapshot = shellRecycle.GetMethod("ReadSnapshot");
-                var isSelectedPath = shellRecycle.GetMethod("IsSelectedPath", BindingFlags.Static | BindingFlags.NonPublic);
-                Assert((bool)isSelectedPath.Invoke(null, new object[] { @"C:\Samples\Report.pdf", @"C:\samples\Report.pdf" }) &&
-                    !(bool)isSelectedPath.Invoke(null, new object[] { @"C:\Samples\Report.pdf", @"C:\Samples\REPORT.PDF" }),
-                    "The recycle guard accepted a different selected filename.");
-                AssertThrowsIOException(() => readSnapshot.Invoke(null, new[] { Path.Combine(fixture, "Report.pdf."), report }), "different path");
-                AssertThrowsIOException(() => readSnapshot.Invoke(null, new[] { Path.Combine(fixture, "NUL.txt"), report }), "different path");
-                AssertThrowsIOException(() => readSnapshot.Invoke(null, new[] { @"\\server\share\Report.pdf", report }), "local Windows drive");
+                var recycleBin = assembly.GetType("DiskBubbles.RecycleBin");
+                var move = recycleBin.GetMethod("MoveAsync", BindingFlags.Static | BindingFlags.NonPublic);
+                var readIdentity = recycleBin.GetMethod("ReadIdentity", BindingFlags.Static | BindingFlags.NonPublic);
+                Func<IList, Task> moveItems = items => (Task)move.Invoke(null, new object[] { items, IntPtr.Zero, null, null });
+                Func<object, string> outcome = item => recycleItem.GetProperty("Outcome", PrivateInstance).GetValue(item).ToString();
+                readIdentity.Invoke(null, new[] { Path.Combine(fixture, "Report.pdf"), report });
+                AssertThrowsIOException(() => readIdentity.Invoke(null, new[] { Path.Combine(fixture, "REPORT.PDF"), report }), "link or alias");
+                AssertThrowsIOException(() => readIdentity.Invoke(null, new[] { Path.Combine(fixture, "Report.pdf."), report }), "different path");
+                AssertThrowsIOException(() => readIdentity.Invoke(null, new[] { Path.Combine(fixture, "NUL.txt"), report }), "different path");
+                AssertThrowsIOException(() => readIdentity.Invoke(null, new[] { @"\\server\share\Report.pdf", report }), "local drive");
                 var batch = Array.CreateInstance(system.GetType(), 3);
                 batch.SetValue(report, 0);
                 batch.SetValue(system, 1);
@@ -421,28 +421,24 @@ internal static class Verification
                 picked.SetValue(design, 0);
                 var beforeReplacement = (IList)prepare.Invoke(null, new object[] { path.Text, picked, CancellationToken.None });
                 Assert((bool)recycleItem.GetProperty("Ready").GetValue(beforeReplacement[0]), "The original folder failed verification.");
-                string scene = Path.Combine(path.Text, "Design Sources", "scene.bin");
-                string replacement = Path.Combine(fixture, "..", "replacement.bin");
-                using (var candidate = File.Create(replacement))
-                    candidate.SetLength(new FileInfo(scene).Length);
-                DateTime fileTime = File.GetLastWriteTimeUtc(scene);
-                string sceneFolder = Path.GetDirectoryName(scene);
-                DateTime parentTime = Directory.GetLastWriteTimeUtc(sceneFolder);
-                File.SetLastWriteTimeUtc(replacement, fileTime);
-                File.Replace(replacement, scene, null);
-                Directory.SetLastWriteTimeUtc(sceneFolder, parentTime);
-                var changedFolder = (Task)move.Invoke(null, new object[] { beforeReplacement });
-                await changedFolder;
-                Assert(((IList)changedFolder.GetType().GetProperty("Result").GetValue(changedFolder)).Count == 0 && File.Exists(scene),
-                    "A folder with an identically sized replacement crossed the recycle boundary.");
-                Assert((bool)recycleItem.GetField("NeedsRescan", PrivateInstance).GetValue(beforeReplacement[0]),
-                    "A changed folder was not marked for a rescan.");
+                string designFolder = Path.Combine(path.Text, "Design Sources");
+                string movedAside = designFolder + " (moved aside)";
+                Directory.Move(designFolder, movedAside);
+                Directory.CreateDirectory(designFolder);
+                await moveItems(beforeReplacement);
+                Assert(outcome(beforeReplacement[0]) == "Failed" && Directory.Exists(designFolder) &&
+                    (bool)recycleItem.GetField("NeedsRescan", PrivateInstance).GetValue(beforeReplacement[0]),
+                    "A folder replaced after review crossed the recycle boundary or was not flagged for a rescan.");
+                Directory.Delete(designFolder);
+                Directory.Move(movedAside, designFolder);
 
                 var simulatedMove = (IList)prepare.Invoke(null, new object[] { path.Text, picked, CancellationToken.None });
                 recycleItem.GetField("Files", PrivateInstance).SetValue(simulatedMove[0], 1L);
                 recycleItem.GetField("Folders", PrivateInstance).SetValue(simulatedMove[0], 1L);
                 recycleItem.GetField("Files", PrivateInstance).SetValue(prepared[0], 1L);
                 simulatedMove.Add(prepared[0]);
+                foreach (object item in simulatedMove)
+                    recycleItem.GetMethod("Succeed", PrivateInstance).Invoke(item, new object[] { true });
                 var markedRoots = (IEnumerable)windowType.GetMethod("MarkedRoots", PrivateInstance).Invoke(window, null);
                 object[] roots = markedRoots.Cast<object>().ToArray();
                 Assert(roots.Length == 2, "A folder and its child both entered the move list.");
@@ -473,6 +469,7 @@ internal static class Verification
 
                 window.Width = window.MinWidth;
                 window.Height = window.MinHeight;
+                await Task.Delay(500);
                 await Capture(window, Path.Combine(fixture, "../compact.png"));
                 setAppearance.Invoke(window, new object[] { true });
                 await Capture(window, Path.Combine(fixture, "../compact-light.png"));
@@ -482,11 +479,14 @@ internal static class Verification
                 await Capture(window, Path.Combine(fixture, "../zero-byte.png"));
 
                 string reportPath = Path.Combine(fixture, "Report.pdf");
+                var reportOnly = Array.CreateInstance(entryType, 1);
+                reportOnly.SetValue(report, 0);
+                var staleReview = (IList)prepare.Invoke(null, new object[] { fixture, reportOnly, CancellationToken.None });
+                Assert((bool)recycleItem.GetProperty("Ready").GetValue(staleReview[0]), "Report could not be reviewed.");
                 File.SetLastWriteTimeUtc(reportPath, File.GetLastWriteTimeUtc(reportPath).AddSeconds(5));
-                var stale = (Task)move.Invoke(null, new object[] { prepared });
-                await stale;
-                Assert(((IList)stale.GetType().GetProperty("Result").GetValue(stale)).Count == 0 && File.Exists(reportPath),
-                    "An entry changed after review but was still moved.");
+                await moveItems(staleReview);
+                Assert(outcome(staleReview[0]) == "Failed" && File.Exists(reportPath), "An entry edited after review was still moved.");
+                await VerifyRealRecycle(assembly, fixture);
                 Assert(File.Exists(Path.Combine(fixture, "System data.bin")), "A system item was moved.");
                 var visuals = assembly.GetType("DiskBubbles.UiVisuals");
                 await VerifyAppCleaner(window, assembly, fixture, expected);
@@ -500,7 +500,7 @@ internal static class Verification
                 await Task.Delay(260);
                 await Capture(notice, Path.Combine(fixture, "../notice.png"));
                 notice.Close();
-                Console.WriteLine($"Verified {files.Count} files and {expected} bytes, map navigation, Recycle Bin safeguards, both themes, App Cleaner progress and icons, app sizing, and uninstall review.");
+                Console.WriteLine($"Verified {files.Count} files and {expected} bytes, map navigation, real Recycle Bin moves and safeguards, both themes, App Cleaner progress and icons, app sizing, and uninstall review.");
                 application.Shutdown(0);
             }
             catch (Exception error)
@@ -828,6 +828,57 @@ internal static class Verification
         FindVisual<Button>(complete, button => Equals(button.Content, "Back to selection")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert(((UIElement)WindowField(window, "_browser")).IsVisible && !complete.IsVisible, "Back did not return to the selection.");
         Assert(!(bool)scene.GetType().GetProperty("IsRunning", PrivateInstance).GetValue(scene), "The hidden success animation kept running.");
+    }
+
+    /// <summary>
+    /// Real items really go to the Recycle Bin, Windows confirms each one, and an item held open by another
+    /// process stays put with a plain reason. This is the path that used to report "did not confirm".
+    /// </summary>
+    private static async Task VerifyRealRecycle(Assembly assembly, string fixture)
+    {
+        string area = Path.Combine(fixture, "..", "recycle-check");
+        Directory.CreateDirectory(area);
+        string file = Path.Combine(area, "Disposable note.txt");
+        string folder = Path.Combine(area, "Disposable folder");
+        string held = Path.Combine(area, "Held open.txt");
+        File.WriteAllText(file, "12345");
+        Directory.CreateDirectory(Path.Combine(folder, "inner"));
+        File.WriteAllText(Path.Combine(folder, "a.txt"), "aa");
+        File.WriteAllText(Path.Combine(folder, "inner", "b.txt"), "bbb");
+        File.WriteAllText(held, "held");
+
+        var entryType = assembly.GetType("DiskBubbles.DiskEntry");
+        var listType = typeof(List<>).MakeGenericType(entryType);
+        Func<string, IList, long, object> entry = (name, children, bytes) => Activator.CreateInstance(entryType, new object[] { name, children, bytes });
+        var inner = (IList)Activator.CreateInstance(listType);
+        inner.Add(entry("b.txt", null, 3L));
+        var children = (IList)Activator.CreateInstance(listType);
+        children.Add(entry("a.txt", null, 2L));
+        children.Add(entry("inner", inner, 3L));
+        var selection = (IList)Activator.CreateInstance(listType);
+        selection.Add(entry("Disposable note.txt", null, 5L));
+        selection.Add(entry("Disposable folder", children, 5L));
+        selection.Add(entry("Held open.txt", null, 4L));
+
+        var recycleItem = assembly.GetType("DiskBubbles.RecycleItem");
+        var prepared = (IList)recycleItem.GetMethod("Prepare", BindingFlags.Static | BindingFlags.NonPublic)
+            .Invoke(null, new object[] { Path.GetFullPath(area), selection, CancellationToken.None });
+        Assert(prepared.Cast<object>().All(item => (bool)recycleItem.GetProperty("Ready").GetValue(item)), "Disposable items failed review.");
+        Assert((long)recycleItem.GetField("Files", PrivateInstance).GetValue(prepared[1]) == 2 &&
+            (long)recycleItem.GetField("Folders", PrivateInstance).GetValue(prepared[1]) == 2, "Folder file and folder counts are wrong.");
+        var move = assembly.GetType("DiskBubbles.RecycleBin").GetMethod("MoveAsync", BindingFlags.Static | BindingFlags.NonPublic);
+        using (new FileStream(held, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            var task = (Task)move.Invoke(null, new object[] { prepared, IntPtr.Zero, null, null });
+            Assert(await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(60))) == task, "The Recycle Bin move hung.");
+        }
+        Func<object, string> outcome = item => recycleItem.GetProperty("Outcome", PrivateInstance).GetValue(item).ToString();
+        Assert(outcome(prepared[0]) == "Recycled" && !File.Exists(file), "A plain file was not confirmed as recycled.");
+        Assert(outcome(prepared[1]) == "Recycled" && !Directory.Exists(folder), "A folder was not confirmed as recycled.");
+        Assert(outcome(prepared[2]) == "Failed" && File.Exists(held) &&
+            ((string)recycleItem.GetProperty("ReviewStatus").GetValue(prepared[2])).Contains("using"),
+            "A file held open by another process was not kept with a clear reason.");
+        Directory.Delete(area, true);
     }
 
     private static void VerifyScanWorkers(Assembly assembly, string fixture)

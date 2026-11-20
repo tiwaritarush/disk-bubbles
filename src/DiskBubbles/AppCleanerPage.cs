@@ -495,13 +495,15 @@ namespace DiskBubbles
                 if (new RecycleReview(_owner, prepared, null, null).ShowDialog() != true) return;
 
                 var byPath = items.ToDictionary(item => item.Location, StringComparer.OrdinalIgnoreCase);
-                var moved = await RecycleItem.MoveWithCheckAsync(prepared, item =>
+                _status.Text = "Moving leftover folders to the Recycle Bin…";
+                await RecycleBin.MoveAsync(prepared, new System.Windows.Interop.WindowInteropHelper(_owner).Handle, null, item =>
                 {
                     var owner = byPath[item.Path];
                     if (AppCleanup.IsRegistered(owner.App) || !AppCleanup.IsSafeLocation(owner.Location, owner.App))
-                        throw new IOException("An app or service now uses this folder.");
+                        throw new IOException("An app or service now uses this folder");
                 });
-                var incomplete = prepared.Except(moved).ToArray();
+                var moved = prepared.Where(item => item.Removed).ToList();
+                var incomplete = prepared.Where(item => !item.Removed).ToArray();
                 if (incomplete.Length > 0)
                     new RecycleReview(_owner, incomplete, null, null, completed: true).ShowDialog();
                 if (moved.Count == 0) return;

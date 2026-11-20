@@ -54,7 +54,12 @@ namespace DiskBubbles
 
         public static Border FrostedPane(UIElement content, string fill = "GlassPane")
         {
-            var inner = Surface(new Border { CornerRadius = new CornerRadius(18), BorderThickness = new Thickness(1), Child = content },
+            var layers = new Grid();
+            var sheen = new Border { CornerRadius = new CornerRadius(17), IsHitTestVisible = false };
+            sheen.SetResourceReference(Border.BackgroundProperty, "GlassSheen");
+            layers.Children.Add(sheen);
+            layers.Children.Add(content);
+            var inner = Surface(new Border { CornerRadius = new CornerRadius(18), BorderThickness = new Thickness(1), Child = layers },
                 fill, "GlassInner");
             return Surface(new Border { CornerRadius = new CornerRadius(19), BorderThickness = new Thickness(1), Child = inner },
                 "Chart", "GlassEdge");
@@ -139,6 +144,8 @@ namespace DiskBubbles
         private readonly Brush _frost;
         private readonly Brush _tint;
         private readonly Brush _bevel;
+        private readonly Brush _sheen;
+        private readonly Brush _glint;
         private readonly Pen _edge;
 
         private GlassOrb(bool light)
@@ -153,7 +160,9 @@ namespace DiskBubbles
 
             if (light)
             {
-                _shadow = Radial(center, 0.5, 0.5, (0, 0x4C4C453D), (0.56, 0x304C453D), (1, 0x004C453D));
+                _shadow = Radial(center, 0.5, 0.5, (0, 0x304C453D), (0.6, 0x184C453D), (1, 0x004C453D));
+                _sheen = Radial(new Point(0.36, 0.22), 0.42, 0.28, (0, 0xC8FFFFFF), (0.55, 0x4DFFFFFF), (1, 0x00FFFFFF));
+                _glint = Radial(center, 0.5, 0.5, (0, 0xF2FFFFFF), (1, 0x00FFFFFF));
                 _body = Linear(new Point(0.18, 0), new Point(0.65, 1),
                     (0, 0xD6FEFCF9), (0.38, 0xA4F9F6F1), (0.71, 0x82EEEAE6), (1, 0xABFFFDF9));
                 _frost = Radial(cloudySide, 0.73, 0.64,
@@ -164,7 +173,9 @@ namespace DiskBubbles
             }
             else
             {
-                _shadow = Radial(center, 0.5, 0.5, (0, 0x96000209), (0.55, 0x62000209), (1, 0x00000209));
+                _shadow = Radial(center, 0.5, 0.5, (0, 0x66000209), (0.6, 0x2E000209), (1, 0x00000209));
+                _sheen = Radial(new Point(0.36, 0.22), 0.42, 0.28, (0, 0x52FFFFFF), (0.55, 0x17FFFFFF), (1, 0x00FFFFFF));
+                _glint = Radial(center, 0.5, 0.5, (0, 0xCCFFFFFF), (1, 0x00FFFFFF));
                 _body = Linear(new Point(0.15, 0), new Point(0.67, 1),
                     (0, 0xCC515353), (0.37, 0xB6383A3A), (0.7, 0xA5282A2A), (1, 0xC43D3F3F));
                 _frost = Radial(cloudySide, 0.68, 0.63,
@@ -180,13 +191,16 @@ namespace DiskBubbles
             bool light = Appearance.IsLight;
             var glass = light ? (_light ??= new GlassOrb(true)) : (_dark ??= new GlassOrb(false));
             if (radius >= 14)
-                drawing.DrawEllipse(glass._shadow, null, new Point(center.X + 3, center.Y + 6), radius * 1.09, radius * 1.08);
+                drawing.DrawEllipse(glass._shadow, null, new Point(center.X, center.Y + radius * 0.10), radius * 1.04, radius * 1.0);
 
             drawing.DrawEllipse(glass._body, null, center, radius, radius);
             drawing.DrawEllipse(glass._frost, null, center, radius, radius);
             if (!SystemParameters.HighContrast)
                 drawing.DrawEllipse(glass._tint, null, center, radius, radius);
             drawing.DrawEllipse(glass._bevel, glass._edge, center, radius, radius);
+            drawing.DrawEllipse(glass._sheen, null, center, radius * 0.97, radius * 0.97);
+            if (radius >= 16)
+                drawing.DrawEllipse(glass._glint, null, new Point(center.X - radius * 0.38, center.Y - radius * 0.52), radius * 0.09, radius * 0.055);
         }
 
         private static Pen Edge(params (double Offset, uint Argb)[] stops)

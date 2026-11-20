@@ -11,8 +11,8 @@
   <SolidColorBrush x:Key="ModeSelection" Color="#383A3B" />
   <SolidColorBrush x:Key="BubbleTint" Color="#2BF08A" />
   <SolidColorBrush x:Key="Accent" Color="#C4C6C6" />
-  <SolidColorBrush x:Key="AccentInk" Color="#F0F0F0" />
-  <SolidColorBrush x:Key="AccentFill" Color="#373939" />
+  <SolidColorBrush x:Key="AccentInk" Color="#111112" />
+  <SolidColorBrush x:Key="AccentFill" Color="#E9EAEA" />
   <SolidColorBrush x:Key="Attention" Color="#F0C3A8" />
   <LinearGradientBrush x:Key="GlassEdge" StartPoint="0,0" EndPoint="0.8,1">
     <GradientStop Offset="0" Color="#565858" />
@@ -40,6 +40,10 @@
     <GradientStop Offset="0.56" Color="#50272829" />
     <GradientStop Offset="1" Color="#301C1D1E" />
   </RadialGradientBrush>
+  <LinearGradientBrush x:Key="GlassSheen" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Offset="0" Color="#10FFFFFF" />
+    <GradientStop Offset="0.28" Color="#00FFFFFF" />
+  </LinearGradientBrush>
   <LinearGradientBrush x:Key="Raised" StartPoint="0,0" EndPoint="0,1">
     <GradientStop Offset="0" Color="#2A2B2C" />
     <GradientStop Offset="1" Color="#222324" />

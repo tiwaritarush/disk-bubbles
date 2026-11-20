@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Interop;
 using IOPath = System.IO.Path;
 
 namespace DiskBubbles
@@ -50,6 +51,16 @@ namespace DiskBubbles
             long bytes = MarkedRoots().Aggregate(0L, (total, mark) => DiskScanner.AddBytes(total, mark.Entry.Bytes));
             _selectionSummary.Text = _marked.Count == 0 ? "No items marked" : $"{CountLabel(_marked.Count, "item")} marked · {DiskEntry.FormatSize(bytes)}";
             _reviewRecycle.IsEnabled = _clearMarks.IsEnabled = _marked.Count > 0;
+            if (_reviewRecycle.Content is System.Windows.Shapes.Shape binIcon)
+                binIcon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, _marked.Count > 0 ? "AccentInk" : "Muted");
+            if (_marked.Count > 0)
+                UiVisuals.Emphasize(_reviewRecycle);
+            else
+            {
+                _reviewRecycle.ClearValue(BackgroundProperty);
+                _reviewRecycle.ClearValue(BorderBrushProperty);
+                _reviewRecycle.ClearValue(ForegroundProperty);
+            }
             _clearMarks.Visibility = _marked.Count > 0 ? Visibility.Visible : Visibility.Hidden;
             UpdateSelection();
         }
@@ -70,6 +81,7 @@ namespace DiskBubbles
             _status.Text = "Checking selected items…  ·  Esc to cancel";
             try
             {
+                // Review checks each selected item itself; it never re-scans folder contents, so it is instant.
                 List<RecycleItem> items = await Task.Run(() => selection.GroupBy(mark => mark.Parent)
                     .SelectMany(group => RecycleItem.Prepare(group.First().Folder, group.Select(mark => mark.Entry), cancellation.Token))
                     .ToList());
@@ -85,30 +97,43 @@ namespace DiskBubbles
                 if (review && new RecycleReview(this, items, projection, _result.Root).ShowDialog() != true)
                     return;
 
-                _movingToBin = true;
-                _status.Text = "Moving reviewed items to the Recycle Bin…";
-                var reviewed = items.Where(item => item.Ready).ToArray();
-                List<RecycleItem> moved = await RecycleItem.MoveAsync(reviewed);
-                _movingToBin = false;
-                var failures = reviewed.Where(item => !item.Ready).ToArray();
-                if (failures.Any(item => item.NeedsRescan) || (moved.Count > 0 && ScannedRecycleBin()))
+                RecycleItem[] ready = items.Where(item => item.Ready).ToArray();
+                if (ready.Length > 0)
+                {
+                    _movingToBin = true;
+                    long files = ready.Sum(item => item.Files);
+                    string scope = $"{CountLabel(ready.Length, "item")} · {CountLabel(files, "file")}";
+                    _status.Text = $"Moving to the Recycle Bin…  ·  {scope}";
+                    var progress = new Progress<RecycleProgress>(step =>
+                    {
+                        double fraction = step.Total == 0 ? 0 : Math.Max(step.Fraction, (double)step.Done / step.Total);
+                        _status.Text = $"Moving to the Recycle Bin…  ·  {step.Done:N0} of {step.Total:N0} done" +
+                            (fraction > 0.001 ? $"  ·  {fraction:P0}" : $"  ·  {scope}");
+                    });
+                    await RecycleBin.MoveAsync(ready, new WindowInteropHelper(this).Handle, progress);
+                    _movingToBin = false;
+                }
+
+                RecycleItem[] moved = ready.Where(item => item.Removed).ToArray();
+                // A direct Delete has no review, so an item that failed its check is reported here too.
+                RecycleItem[] failures = (review ? ready : items.ToArray()).Where(item => !item.Removed).ToArray();
+                if (failures.Any(item => item.NeedsRescan) || (moved.Length > 0 && ScannedRecycleBin()))
                     _result.NeedsRefresh = true;
-                if (moved.Count > 0)
+                if (moved.Length > 0)
                 {
                     ApplyRecycled(moved, selection);
                     refreshed = true;
-                    _status.Text += $"  ·  {moved.Count:N0} moved to Recycle Bin";
                 }
 
                 if (failures.Length > 0)
                     new RecycleReview(this, failures, _trail[_trail.Count - 1], _result.Root, completed: true).ShowDialog();
-                if (moved.Count > 0)
+                if (moved.Length > 0)
                     ShowRecycleSuccess(moved);
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
             {
             }
-            catch (Exception error) when (DiskScanner.IsFileSystemError(error) || error is ArgumentException)
+            catch (Exception error) when (RecycleBin.IsItemError(error))
             {
                 if (!_closed)
                     UiVisuals.Notice(this, "Can’t review these items", error.Message).ShowDialog();
@@ -139,7 +164,7 @@ namespace DiskBubbles
             if (moved.Count == 0)
                 return;
             long bytes = moved.Aggregate(0L, (total, item) => DiskScanner.AddBytes(total, item.Entry.Bytes));
-            _completed.ShowResult(bytes, moved.Count);
+            _completed.ShowResult(bytes, moved.Count, moved.Count(item => item.Outcome == RecycleOutcome.Deleted));
             ShowPage(_completed);
         }
 
@@ -187,8 +212,8 @@ namespace DiskBubbles
                 mark.Entry.IsMarked = false;
                 _marked.Remove(mark.Entry);
             }
-            _result.Files -= moved.Sum(item => item.Files);
-            _result.Folders -= moved.Sum(item => item.Folders);
+            _result.Files = Math.Max(0, _result.Files - moved.Sum(item => item.Files));
+            _result.Folders = Math.Max(1, _result.Folders - moved.Sum(item => item.Folders));
             PruneHistory(_backHistory, removed);
             PruneHistory(_forwardHistory, removed);
             int removedLevel = _trail.FindIndex(removed.Contains);
@@ -196,6 +221,7 @@ namespace DiskBubbles
                 _trail = _trail.GetRange(0, removedLevel);
             _map.InvalidateLayout(changes.Keys);
             RefreshBrowser();
+            _status.Text += $"  ·  {moved.Count:N0} removed";
         }
 
         private static void PruneHistory(Stack<List<DiskEntry>> history, HashSet<DiskEntry> removed)

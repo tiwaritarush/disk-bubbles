@@ -2,7 +2,7 @@
 
 Disk Bubbles shows where your Windows storage went. Scan a drive or folder and get a map sized by the files inside it. The biggest folders are easy to spot, and a click takes you straight into one.
 
-[Download 10.5.1 for Windows](https://github.com/tiwaritarush/disk-bubbles/releases/download/v10.5.1/DiskBubbles.exe) · [Release notes](https://github.com/tiwaritarush/disk-bubbles/releases/tag/v10.5.1) · [Build from source](#build-from-source) · [Report an issue](https://github.com/tiwaritarush/disk-bubbles/issues)
+[Download for Windows](https://github.com/tiwaritarush/disk-bubbles/releases/latest) · [Changelog](CHANGELOG.md) · [Build from source](#build-from-source) · [Report an issue](https://github.com/tiwaritarush/disk-bubbles/issues)
 
 Windows 10 and 11 · Portable executable · C# and WPF · MIT
 
@@ -14,7 +14,7 @@ Windows can tell you that a drive is nearly full. Figuring out which project, do
 
 - **Scan a drive or folder.** See progress as Windows enumerates the files. You can cancel a scan and return to your previous results.
 - **Explore by size.** Click a folder in the list or on the map to open it. Hover to see its size and share of the current folder. Use the map arrows to see smaller entries, including empty ones. Back and Forward remember your scroll position and map page.
-- **Mark items as you browse.** Check files or folders anywhere in the scan. Use the trash icon at the bottom right to review everything together. The app protects critical Windows locations and verifies file identities before asking Windows to move anything.
+- **Mark items as you browse.** Check files or folders anywhere in the scan. Use the trash icon at the bottom right to review everything together. The app protects critical Windows locations and verifies file identities before asking Windows to move anything. Every item ends with a clear result: moved to the Recycle Bin, permanently deleted after the Windows prompt for items too large for the Bin, or kept with the reason.
 - **Uninstall apps.** App Cleaner lists desktop and Store apps with their icons and measured install sizes. Choose **Uninstall** or **Deep Uninstall** from the app details pane. Confirmed removals leave the list immediately, and the current filter stays in place.
 - **Review leftovers.** After a supported uninstall, review remaining install folders. Deep Uninstall also checks matching app data and caches. Choose whether to move verified folders to the Recycle Bin.
 - **Switch between light and dark.** The bubbles catch a pink reflection in the cream theme and a green one in the charcoal theme. The app remembers your choice and follows the Windows animation setting.
@@ -48,7 +48,7 @@ Install the .NET SDK on Windows. From the repository root in PowerShell, run the
 .\Verify.ps1
 ```
 
-The build writes `artifacts/DiskBubbles.exe`. Verification runs against files it creates under `artifacts/verification/` and saves screenshots there. It exercises the UI and Recycle Bin safeguards using disposable fixtures. Release details and remaining validation gaps are in the [changelog](CHANGELOG.md).
+The build writes `artifacts/DiskBubbles.exe`. Verification runs against files it creates under `artifacts/verification/` and saves screenshots there. It exercises the UI and safeguards and moves disposable fixture files to your Recycle Bin to prove each outcome. Release details and remaining validation gaps are in the [changelog](CHANGELOG.md).
 
 ## How it works
 

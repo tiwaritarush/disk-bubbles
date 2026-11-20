@@ -51,7 +51,18 @@
     </Setter>
   </Style>
 
+  <Style x:Key="RingFocus">
+    <Setter Property="Control.Template">
+      <Setter.Value>
+        <ControlTemplate>
+          <Border Margin="-3" CornerRadius="14" BorderThickness="1.5" BorderBrush="{DynamicResource Accent}" />
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <Style TargetType="Button">
+    <Setter Property="FocusVisualStyle" Value="{StaticResource RingFocus}" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     <Setter Property="Background" Value="{DynamicResource Raised}" />
     <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
@@ -75,9 +86,6 @@
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
               <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource Accent}" />
-            </Trigger>
-            <Trigger Property="IsKeyboardFocused" Value="True">
-              <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
               <Setter TargetName="Frame" Property="Opacity" Value="0.86" />

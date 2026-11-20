@@ -1,5 +1,17 @@
 # Changelog
 
+## 11.0.0
+
+- Fix deletion reporting "Windows did not confirm the move" for items it had in fact moved, and never reaching the Deleted page. The old code called `ITransferSource::RecycleItem` directly and treated Windows' non-zero success codes as failures.
+- Move items with `IFileOperation`, the engine File Explorer uses, in one batch. Windows reports every item: moved to the Recycle Bin, permanently deleted, or kept with a plain reason such as an app holding it open, access denied, or changed or missing since review.
+- Remove the hang before deleting. Review no longer re-scans each selected folder and opens every file inside it twice; it checks the selected item itself, so large folders review in milliseconds. The status line reports progress while Windows moves them.
+- Items too large for the Recycle Bin bring up the standard Windows permanent-delete prompt. Declining keeps the item and the results say why. The Deleted page says when items were permanently deleted.
+- A file edited after review, or a folder replaced by another of the same name, is not moved. A direct Delete on an item that fails its check now explains why instead of doing nothing.
+- Polish the glass: a soft contact shadow replaces the offset halo under bubbles, bubbles gain a specular sheen and glint, and panes a light top sheen. Small bubbles show their names.
+- Show focus rings for keyboard navigation only, keep the disabled delete button a quiet outline, give dark mode a distinct primary button, and lead the Deleted page with Back to selection.
+- Verification moves real fixture files to the Recycle Bin, including a file held open by another process.
+- Align the managed and manifest versions, which had drifted to 10.5.1 and 10.4.1.
+
 ## 10.5.1
 
 - Allow customized Downloads and other ordinary folders to pass deletion checks when they contain `desktop.ini` or thumbnail metadata. Keep critical Windows paths, app-managed locations, system files and unverified links protected.

@@ -42,6 +42,7 @@ namespace DiskBubbles
             var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 24, 0, 16) };
             var back = new Button { Content = "Back to selection", MinWidth = 176, Margin = new Thickness(4) };
             var home = new Button { Content = "Home screen", MinWidth = 150, Margin = new Thickness(4) };
+            UiVisuals.Emphasize(back);
             back.Click += (sender, args) => BackRequested?.Invoke();
             home.Click += (sender, args) => HomeRequested?.Invoke();
             actions.Children.Add(back);
@@ -50,10 +51,13 @@ namespace DiskBubbles
             content.Children.Add(actions);
         }
 
-        public void ShowResult(long bytes, int count)
+        public void ShowResult(long bytes, int count, int permanentlyDeleted = 0)
         {
             _size.Text = DiskEntry.FormatSize(bytes);
-            _detail.Text = $"{count:N0} {(count == 1 ? "item" : "items")} moved to Recycle Bin";
+            int recycled = count - permanentlyDeleted;
+            _detail.Text = permanentlyDeleted == 0 ? $"{count:N0} {(count == 1 ? "item" : "items")} moved to Recycle Bin"
+                : recycled == 0 ? $"{count:N0} {(count == 1 ? "item" : "items")} permanently deleted"
+                : $"{recycled:N0} moved to Recycle Bin · {permanentlyDeleted:N0} permanently deleted";
             AutomationProperties.SetName(this, "Deleted " + _size.Text + ". " + _detail.Text);
             _scene.Restart();
         }
