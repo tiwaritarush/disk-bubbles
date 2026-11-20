@@ -64,16 +64,18 @@ namespace DiskBubbles
         private readonly ProgressBar _spinner = new ProgressBar { Height = 6, Width = 288 };
         private readonly Grid _landing = new Grid();
         private readonly Grid _scanning = new Grid();
+        private readonly RecycleCompletePage _completed = new RecycleCompletePage();
         private readonly List<StorageIllustration> _illustrations = new List<StorageIllustration>(2);
         private readonly Stack<List<DiskEntry>> _backHistory = new Stack<List<DiskEntry>>();
         private readonly Stack<List<DiskEntry>> _forwardHistory = new Stack<List<DiskEntry>>();
         private readonly ConditionalWeakTable<DiskEntry, FolderView> _folderViews = new ConditionalWeakTable<DiskEntry, FolderView>();
         private List<DiskEntry> _trail = new List<DiskEntry>();
         private DiskEntry _rowPressed;
+        private DiskEntry _markPressed;
         private Point _rowPressPoint;
         private bool _recycleBusy;
         private bool _movingToBin;
-        private ListBoxItem _linkedRow;
+        private DiskEntry _linkedEntry;
         private ScanResult _result;
         private string _rootPath;
         private CancellationTokenSource _scan;
@@ -119,6 +121,9 @@ namespace DiskBubbles
             _surface.Children.Add(_landing);
             _surface.Children.Add(_scanning);
             _surface.Children.Add(_appCleaner);
+            _surface.Children.Add(_completed);
+            _completed.BackRequested += () => ShowPage(_browser);
+            _completed.HomeRequested += () => ShowPage(_landing);
             ShowPage(_landing);
 
             _folder.Click += async (sender, args) => await ChooseFolderAsync();
@@ -143,10 +148,8 @@ namespace DiskBubbles
             _map.BackgroundActivated += () => Navigate(_trail.Count - 2);
             _map.HoverChanged += entry =>
             {
-                _linkedRow?.ClearValue(TagProperty);
-                _linkedRow = entry == null ? null : _entries.ItemContainerGenerator.ContainerFromItem(entry) as ListBoxItem;
-                if (_linkedRow != null)
-                    _linkedRow.Tag = "Linked";
+                if (entry != null)
+                    LinkEntry(entry);
                 UpdateMapCaption();
             };
             _entries.MouseMove += (sender, args) =>
@@ -160,6 +163,7 @@ namespace DiskBubbles
             };
             _entries.MouseLeave += (sender, args) =>
             {
+                _markPressed = null;
                 _map.RowHover = null;
                 UpdateMapCaption();
             };
@@ -176,6 +180,9 @@ namespace DiskBubbles
             _entries.SelectionChanged += (sender, args) => UpdateSelection();
             _entries.PreviewMouseLeftButtonDown += (sender, args) =>
             {
+                _markPressed = MarkAt(args.OriginalSource);
+                if (_markPressed != null)
+                    args.Handled = true;
                 _rowPressed = args.ClickCount == 1 ? RowAt(args.OriginalSource) : null;
                 _rowPressPoint = args.GetPosition(_entries);
             };
@@ -184,6 +191,16 @@ namespace DiskBubbles
                 DiskEntry pressed = _rowPressed;
                 _rowPressed = null;
                 Vector movement = args.GetPosition(_entries) - _rowPressPoint;
+                DiskEntry mark = _markPressed;
+                _markPressed = null;
+                if (mark != null)
+                {
+                    args.Handled = true;
+                    if (mark == MarkAt(args.OriginalSource) && Math.Abs(movement.X) <= SystemParameters.MinimumHorizontalDragDistance &&
+                        Math.Abs(movement.Y) <= SystemParameters.MinimumVerticalDragDistance)
+                        SetMarked(mark, !mark.IsMarked);
+                    return;
+                }
                 if (pressed == null || !pressed.IsFolder || pressed != RowAt(args.OriginalSource) ||
                     Math.Abs(movement.X) > SystemParameters.MinimumHorizontalDragDistance ||
                     Math.Abs(movement.Y) > SystemParameters.MinimumVerticalDragDistance)
@@ -334,6 +351,8 @@ namespace DiskBubbles
 
         private void RefreshBrowser(DiskEntry origin = null, bool returning = false, bool restoreView = false, bool animate = false)
         {
+            LinkEntry(null);
+            _markPressed = null;
             DiskEntry current = _trail[_trail.Count - 1];
             current.OrderChildren();
             FolderView view = restoreView && _folderViews.TryGetValue(current, out FolderView remembered) ? remembered : null;
@@ -538,6 +557,34 @@ namespace DiskBubbles
             UpdateMapCaption();
         }
 
+        private void LinkEntry(DiskEntry entry)
+        {
+            if (_linkedEntry == entry)
+                return;
+            if (_linkedEntry != null)
+                _linkedEntry.IsLinked = false;
+            _linkedEntry = entry;
+            if (entry != null)
+            {
+                entry.IsLinked = true;
+                _entries.ScrollIntoView(entry);
+            }
+        }
+
+        private DiskEntry MarkAt(object source)
+        {
+            for (var node = source as Visual; node != null && node != _entries; node = VisualTreeHelper.GetParent(node) as Visual)
+            {
+                if (node is CheckBox box)
+                    return box.DataContext as DiskEntry;
+                if (node is Grid { Name: "MarkArea" } area)
+                    return area.DataContext as DiskEntry;
+                if (node is ListBoxItem)
+                    break;
+            }
+            return null;
+        }
+
         private DiskEntry RowAt(object source)
         {
             for (var node = source as Visual; node != null && node != _entries;
@@ -570,9 +617,23 @@ namespace DiskBubbles
             if (_trail.Count == 0 || !NativeDirectoryReader.IsEntryName(entry.Name))
                 return null;
             string path = IOPath.Combine(CurrentPath(), entry.Name);
+            var target = new MarkedEntry { Entry = entry, Parents = _trail.ToArray(), Folder = CurrentPath() };
+            var select = new MenuItem { Header = "Select" };
+            select.Click += (sender, args) =>
+            {
+                if (_trail.Count == 0 || !_trail[_trail.Count - 1].Children.Contains(entry)) return;
+                SetMarked(entry, true);
+                _entries.SelectedItem = entry;
+                LinkEntry(entry);
+            };
+            var delete = new MenuItem { Header = "Delete", IsEnabled = entry.CanRecycle,
+                ToolTip = entry.CanRecycle ? "Move this item to the Recycle Bin" : SystemProtection.Reason(entry) };
+            delete.Click += async (sender, args) => await RecycleAsync(new[] { target }, review: false);
             var open = new MenuItem { Header = "Open in Explorer", ToolTip = path };
             open.Click += (sender, args) => OpenExplorer(entry.IsFolder ? "\"" + path + "\"" : "/select,\"" + path + "\"");
             var menu = new ContextMenu { PlacementTarget = _map, Placement = PlacementMode.MousePoint, FontSize = 14 };
+            menu.Items.Add(select);
+            menu.Items.Add(delete);
             menu.Items.Add(open);
             return menu;
         }

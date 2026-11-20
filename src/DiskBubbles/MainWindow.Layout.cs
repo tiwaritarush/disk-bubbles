@@ -68,6 +68,7 @@ namespace DiskBubbles
             UiVisuals.UpdateCaption(this);
             UpdateAppearanceButton();
             _map.UpdateAppearance();
+            _completed.UpdateAppearance();
             foreach (StorageIllustration illustration in _illustrations)
                 illustration.InvalidateVisual();
         }
@@ -214,6 +215,7 @@ namespace DiskBubbles
             sidebar.Children.Add(heading);
 
             _entries.Background = Brushes.Transparent;
+            _entries.Style = (Style)FindResource("AppResults");
             _entries.BorderThickness = new Thickness(0);
             _entries.ItemContainerStyle = (Style)FindResource("EntryRow");
             _entries.ItemTemplate = (DataTemplate)FindResource("EntryTemplate");

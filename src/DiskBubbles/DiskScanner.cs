@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Security;
@@ -9,10 +10,12 @@ using System.Threading.Tasks;
 
 namespace DiskBubbles
 {
-    public sealed class DiskEntry
+    public sealed class DiskEntry : INotifyPropertyChanged
     {
         private static readonly string[] SizeUnits = { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
         private bool _ordered;
+        private bool _marked;
+        private bool _linked;
 
         public DiskEntry(string name, List<DiskEntry> children, long bytes = 0)
         {
@@ -26,8 +29,28 @@ namespace DiskBubbles
         public bool IsFolder => Children != null;
         public string SizeLabel => FormatSize(Bytes);
         public bool IsSystem => IsFolder && (Protection & EntryProtection.CriticalFolder) != 0;
-        public bool CanMark => Protection == EntryProtection.None;
-        public bool IsMarked { get; internal set; }
+        public bool CanRecycle => Protection == EntryProtection.None;
+        public bool IsMarked
+        {
+            get => _marked;
+            internal set
+            {
+                if (_marked == value) return;
+                _marked = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsMarked)));
+            }
+        }
+        public bool IsLinked
+        {
+            get => _linked;
+            internal set
+            {
+                if (_linked == value) return;
+                _linked = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsLinked)));
+            }
+        }
+        public event PropertyChangedEventHandler PropertyChanged;
         public string AccessibleName => Name + ", " + SizeLabel + (IsSystem ? ", critical Windows folder" : "");
         internal EntryProtection Protection { get; set; }
         internal List<DiskEntry> Children { get; }

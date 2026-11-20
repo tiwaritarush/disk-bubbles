@@ -176,6 +176,7 @@
   </Style>
 
   <Style TargetType="MenuItem">
+    <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
     <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     <Setter Property="Padding" Value="10,7" />
     <Setter Property="Template">
@@ -187,6 +188,9 @@
           <ControlTemplate.Triggers>
             <Trigger Property="IsHighlighted" Value="True">
               <Setter TargetName="Frame" Property="Background" Value="{DynamicResource MenuHover}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Frame" Property="Opacity" Value="0.4" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -280,9 +284,9 @@
             <Trigger Property="IsMouseOver" Value="True">
               <Setter TargetName="Frame" Property="Background" Value="{DynamicResource RowHover}" />
             </Trigger>
-            <Trigger Property="Tag" Value="Linked">
+            <DataTrigger Binding="{Binding IsLinked}" Value="True">
               <Setter TargetName="Frame" Property="Background" Value="{DynamicResource RowLinked}" />
-            </Trigger>
+            </DataTrigger>
             <Trigger Property="IsSelected" Value="True">
               <Setter TargetName="Frame" Property="Background" Value="{DynamicResource RowSelected}" />
               <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource RowSelectedEdge}" />
@@ -344,8 +348,8 @@
         <ColumnDefinition Width="73" />
       </Grid.ColumnDefinitions>
       <Grid x:Name="MarkArea" Background="Transparent">
-        <CheckBox x:Name="Mark" Width="Auto" Height="Auto" Style="{StaticResource EntryMark}" IsChecked="{Binding IsMarked, Mode=OneTime}"
-                  IsEnabled="{Binding CanMark, Mode=OneTime}" ToolTip="Mark for Recycle Bin review"
+        <CheckBox x:Name="Mark" Width="Auto" Height="Auto" Style="{StaticResource EntryMark}" IsChecked="{Binding IsMarked, Mode=OneWay}"
+                  ToolTip="Select for Recycle Bin review"
                   automation:AutomationProperties.Name="{Binding Name, StringFormat='Mark {0} for Recycle Bin review'}" />
       </Grid>
       <Border Grid.Column="1" Width="20" Height="26" HorizontalAlignment="Left">

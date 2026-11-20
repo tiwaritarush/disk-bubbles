@@ -23,7 +23,7 @@ namespace DiskBubbles
 
         private void SetMarked(DiskEntry entry, bool marked)
         {
-            if (!entry.CanMark || _trail.Count == 0)
+            if (_trail.Count == 0)
                 return;
             entry.IsMarked = marked;
             if (marked)
@@ -54,12 +54,15 @@ namespace DiskBubbles
             UpdateSelection();
         }
 
-        private async Task ReviewRecycleAsync()
+        private Task ReviewRecycleAsync() => _marked.Count == 0 ? Task.CompletedTask : RecycleAsync(MarkedRoots().ToArray(), review: true);
+
+        private async Task RecycleAsync(MarkedEntry[] selection, bool review)
         {
-            if (_recycleBusy || _scan != null || _marked.Count == 0)
+            if (_recycleBusy || _scan != null || selection.Length == 0)
+                return;
+            if (_result == null || selection.Any(mark => mark.Parents.Length == 0 || mark.Parents[0] != _result.Root))
                 return;
 
-            var selection = MarkedRoots().ToArray();
             bool refreshed = false;
             using var cancellation = new CancellationTokenSource();
             _recycleCheck = cancellation;
@@ -79,7 +82,7 @@ namespace DiskBubbles
                     _result.NeedsRefresh = true;
                 DiskEntry current = _trail[_trail.Count - 1];
                 DiskEntry projection = selection.All(mark => mark.Parents.Contains(current)) ? current : null;
-                if (new RecycleReview(this, items, projection, _result.Root).ShowDialog() != true)
+                if (review && new RecycleReview(this, items, projection, _result.Root).ShowDialog() != true)
                     return;
 
                 _movingToBin = true;
@@ -99,6 +102,8 @@ namespace DiskBubbles
 
                 if (failures.Length > 0)
                     new RecycleReview(this, failures, _trail[_trail.Count - 1], _result.Root, completed: true).ShowDialog();
+                if (moved.Count > 0)
+                    ShowRecycleSuccess(moved);
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
             {
@@ -125,7 +130,17 @@ namespace DiskBubbles
         {
             _recycleBusy = busy;
             _appsMode.IsEnabled = !busy;
+            _diskMode.IsEnabled = !busy;
             _browser.IsEnabled = _folder.IsEnabled = _drive.IsEnabled = !busy;
+        }
+
+        private void ShowRecycleSuccess(IReadOnlyList<RecycleItem> moved)
+        {
+            if (moved.Count == 0)
+                return;
+            long bytes = moved.Aggregate(0L, (total, item) => DiskScanner.AddBytes(total, item.Entry.Bytes));
+            _completed.ShowResult(bytes, moved.Count);
+            ShowPage(_completed);
         }
 
         private bool ScannedRecycleBin() =>
