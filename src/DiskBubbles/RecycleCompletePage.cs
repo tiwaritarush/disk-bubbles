@@ -42,6 +42,7 @@ namespace DiskBubbles
             var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 24, 0, 16) };
             var back = new Button { Content = "Back to selection", MinWidth = 176, Margin = new Thickness(4) };
             var home = new Button { Content = "Home screen", MinWidth = 150, Margin = new Thickness(4) };
+            UiVisuals.Emphasize(back);
             back.Click += (sender, args) => BackRequested?.Invoke();
             home.Click += (sender, args) => HomeRequested?.Invoke();
             actions.Children.Add(back);

@@ -51,6 +51,16 @@ namespace DiskBubbles
             long bytes = MarkedRoots().Aggregate(0L, (total, mark) => DiskScanner.AddBytes(total, mark.Entry.Bytes));
             _selectionSummary.Text = _marked.Count == 0 ? "No items marked" : $"{CountLabel(_marked.Count, "item")} marked · {DiskEntry.FormatSize(bytes)}";
             _reviewRecycle.IsEnabled = _clearMarks.IsEnabled = _marked.Count > 0;
+            if (_reviewRecycle.Content is System.Windows.Shapes.Shape binIcon)
+                binIcon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, _marked.Count > 0 ? "AccentInk" : "Muted");
+            if (_marked.Count > 0)
+                UiVisuals.Emphasize(_reviewRecycle);
+            else
+            {
+                _reviewRecycle.ClearValue(BackgroundProperty);
+                _reviewRecycle.ClearValue(BorderBrushProperty);
+                _reviewRecycle.ClearValue(ForegroundProperty);
+            }
             _clearMarks.Visibility = _marked.Count > 0 ? Visibility.Visible : Visibility.Hidden;
             UpdateSelection();
         }

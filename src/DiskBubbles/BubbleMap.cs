@@ -503,7 +503,9 @@ namespace DiskBubbles
 
             if (bubble.Radius < 28)
             {
-                if (bubble.Radius >= 9)
+                if (bubble.Radius >= 19)
+                    DrawLabel(drawing, bubble, bubble.Entry.Name, _nameFont, 10.5, NameInk, 0);
+                else if (bubble.Radius >= 9)
                     DrawGlyph(drawing, bubble, centered: true);
                 return;
             }

@@ -40,6 +40,10 @@
     <GradientStop Offset="0.56" Color="#64F8F5F0" />
     <GradientStop Offset="1" Color="#20F8F5F0" />
   </RadialGradientBrush>
+  <LinearGradientBrush x:Key="GlassSheen" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Offset="0" Color="#5CFFFFFF" />
+    <GradientStop Offset="0.28" Color="#00FFFFFF" />
+  </LinearGradientBrush>
   <LinearGradientBrush x:Key="Raised" StartPoint="0,0" EndPoint="0,1">
     <GradientStop Offset="0" Color="#FFFCF7" />
     <GradientStop Offset="1" Color="#ECE6DC" />

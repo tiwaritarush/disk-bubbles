@@ -469,6 +469,7 @@ internal static class Verification
 
                 window.Width = window.MinWidth;
                 window.Height = window.MinHeight;
+                await Task.Delay(500);
                 await Capture(window, Path.Combine(fixture, "../compact.png"));
                 setAppearance.Invoke(window, new object[] { true });
                 await Capture(window, Path.Combine(fixture, "../compact-light.png"));
