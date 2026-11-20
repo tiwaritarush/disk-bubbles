@@ -304,11 +304,13 @@
       <Setter.Value>
         <ControlTemplate TargetType="CheckBox">
           <Grid Background="Transparent">
-            <Border x:Name="Box" Width="15" Height="15" CornerRadius="4" BorderThickness="1"
-                    BorderBrush="{DynamicResource Subtle}" Background="Transparent" />
-            <Path x:Name="Check" Data="M 0,3 L 2.6,5.6 7,0.5" Stroke="{DynamicResource AccentInk}"
-                  StrokeThickness="1.45" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Visibility="Collapsed"
-                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Grid Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+              <Border x:Name="Box" CornerRadius="4" BorderThickness="1"
+                      BorderBrush="{DynamicResource Subtle}" Background="Transparent" />
+              <Path x:Name="Check" Data="M 3.5,8 L 6.5,11 12,5" Stroke="{DynamicResource AccentInk}"
+                    StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                    Visibility="Collapsed" />
+            </Grid>
           </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
