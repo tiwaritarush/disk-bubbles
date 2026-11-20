@@ -1,5 +1,11 @@
 # Changelog
 
+## 10.4.2
+
+- Center the checkbox tick inside its outline in Disk Scan and App Cleaner. The surrounding click area belongs to the checkbox.
+- Increase scan concurrency on storage that Windows reports without a seek penalty. Keep the previous worker limit for seeking and unknown devices.
+- Verify that serial and parallel scans produce the same tree, sizes and protection flags. Add a repeatable scan benchmark and record the measurements.
+
 ## 10.4.1
 
 - Remove confirmed uninstalls from the current app list without a full scan.

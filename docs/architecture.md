@@ -18,6 +18,8 @@ The verification fixture covers removal-command validation, both uninstall revie
 
 Scans observe a live filesystem. Entries can change while a directory is being read, so the map is a view of what the scanner observed during that run. Reparse points discovered during enumeration and unreadable entries are counted as skipped.
 
+The default worker limit depends on the volume's [Windows seek-penalty descriptor](https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-device_seek_penalty_descriptor). A successful query reporting no seek penalty permits up to twice the logical processor count, capped at 32 workers. Seeking disks and failed or unsupported queries retain the previous limit of eight workers or the logical processor count, whichever is smaller. The query opens a volume handle with zero requested read/write access and uses [IOCTL_STORAGE_QUERY_PROPERTY](https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ni-winioctl-ioctl_storage_query_property). It does not read raw disk contents. [Performance measurements](performance.md) document the tuning.
+
 ## From review to Recycle Bin
 
 Marks belong to a scan and carry the item's original folder path. Review collapses nested marks under a marked parent to avoid moving or counting them twice. It checks each proposed move against the selected path and file identity. Folders also get a fingerprint of descendant identities and timestamps. The app rechecks these before asking Windows to recycle the verified item through `ITransferSource::RecycleItem`. It updates the affected folders when the Shell confirms a move and prompts for a rescan when the result is uncertain.

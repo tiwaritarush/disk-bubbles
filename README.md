@@ -2,7 +2,7 @@
 
 Disk Bubbles shows where your Windows storage went. Scan a drive or folder and get a map sized by the files inside it. The biggest folders are easy to spot, and a click takes you straight into one.
 
-[Download 10.4.1 for Windows](https://github.com/tiwaritarush/disk-bubbles/releases/download/v10.4.1/DiskBubbles.exe) · [Release notes](https://github.com/tiwaritarush/disk-bubbles/releases/tag/v10.4.1) · [Build from source](#build-from-source) · [Report an issue](https://github.com/tiwaritarush/disk-bubbles/issues)
+[Download 10.4.2 for Windows](https://github.com/tiwaritarush/disk-bubbles/releases/download/v10.4.2/DiskBubbles.exe) · [Release notes](https://github.com/tiwaritarush/disk-bubbles/releases/tag/v10.4.2) · [Build from source](#build-from-source) · [Report an issue](https://github.com/tiwaritarush/disk-bubbles/issues)
 
 Windows 10 and 11 · Portable executable · C# and WPF · MIT
 
@@ -48,7 +48,9 @@ The build writes `artifacts/DiskBubbles.exe`. Verification runs against files it
 
 ## How it works
 
-Disk Bubbles is written in **C#** with a **WPF and XAML** interface on **.NET Framework 4.8**. The scanner reads Windows directory records in batches and uses several workers to cover a volume. The map uses native WPF drawings, which are cached when you go back to a folder. The app has no external package dependencies.
+Disk Bubbles is written in **C#** with a **WPF and XAML** interface on **.NET Framework 4.8**. The scanner reads Windows directory records in batches and uses several workers to cover a volume. It uses more workers on storage that Windows reports without a seek penalty. The map uses native WPF drawings, which are cached when you go back to a folder. The app has no external package dependencies.
+
+[Scan measurements and the benchmark command](docs/performance.md) explain the current worker limits and their measured effect.
 
 See [the architecture notes](docs/architecture.md) for the scan and Recycle Bin boundaries. For patches and bug reports, see [Contributing](CONTRIBUTING.md). For a potential vulnerability, use the [security reporting instructions](SECURITY.md).
 
