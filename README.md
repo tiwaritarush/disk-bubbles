@@ -1,6 +1,6 @@
 # Disk Bubbles
 
-Disk Bubbles shows where your Windows storage went. Scan a drive or folder and get a map of glass bubbles whose area is the space they use. The biggest folders are easy to spot, and a click takes you straight into one.
+Disk Bubbles shows where your Windows storage went. Scan a drive or folder and get a map sized by the files inside it. The biggest folders are easy to spot, and a click takes you straight into one.
 
 [Download for Windows](https://github.com/tiwaritarush/disk-bubbles/releases/latest) · [Changelog](CHANGELOG.md) · [Build from source](#build-from-source) · [Report an issue](https://github.com/tiwaritarush/disk-bubbles/issues)
 
@@ -13,11 +13,11 @@ Windows can tell you that a drive is nearly full. Figuring out which project, do
 ## What you can do
 
 - **Scan a drive or folder.** See progress as Windows enumerates the files. You can cancel a scan and return to your previous results.
-- **Explore by size.** Bubble area is true to size, and folders show their biggest contents inside them. Click a folder in the list or on the map to open it. Hover to see its size and share of the current folder. When a folder holds more than fits legibly, a **+N more** bubble and the **Next page** button show the rest. Back and Forward remember your scroll position and map page.
-- **Mark items as you browse.** Check files or folders anywhere in the scan, then choose **Review & delete** in the footer. Every item ends with a clear result: moved to the Recycle Bin, permanently deleted after the Windows prompt for items too large for the Bin, or kept with the reason.
+- **Explore by size.** Click a folder in the list or on the map to open it. Hover to see its size and share of the current folder. Use the map arrows to see smaller entries, including empty ones. Back and Forward remember your scroll position and map page.
+- **Mark items as you browse.** Check files or folders anywhere in the scan. Use the trash icon at the bottom right to review everything together. The app protects critical Windows locations and verifies file identities before asking Windows to move anything. Every item ends with a clear result: moved to the Recycle Bin, permanently deleted after the Windows prompt for items too large for the Bin, or kept with the reason.
 - **Uninstall apps.** App Cleaner lists desktop and Store apps with their icons and measured install sizes. Choose **Uninstall** or **Deep Uninstall** from the app details pane. Confirmed removals leave the list immediately, and the current filter stays in place.
 - **Review leftovers.** After a supported uninstall, review remaining install folders. Deep Uninstall also checks matching app data and caches. Choose whether to move verified folders to the Recycle Bin.
-- **Switch between light and dark.** Both themes are liquid glass over soft coloured light. Folder bubbles glow green in the dark theme and pink in the light one, and files carry a subtle tint for their kind. The app remembers your choice and follows the Windows animation setting.
+- **Switch between light and dark.** The bubbles catch a pink reflection in the cream theme and a green one in the charcoal theme. The app remembers your choice and follows the Windows animation setting.
 
 ![Disk Bubbles in the cream and ink theme with frosted glass bubbles.](docs/screenshots/light.png)
 
@@ -29,11 +29,11 @@ Screenshots use a disposable sample library and example app names.
 
 Get `DiskBubbles.exe` from the [releases page](https://github.com/tiwaritarush/disk-bubbles/releases) and run it on Windows 10 or 11 with .NET Framework 4.8 or later. It runs with your usual Windows permissions. The portable executable is unsigned, and the release includes a SHA-256 checksum for checking the download.
 
-Start with **Scan C:** or **Choose folder…**. Click a folder name or bubble to open it. The last bubble you hover stays highlighted in the list until you hover another one. Right-click a bubble to open it, mark it, move it straight to the Recycle Bin, or show it in File Explorer.
+Start with **Scan C:** or **Choose folder…**. Click a folder name or bubble to open it. The last bubble you hover stays highlighted in the list until you hover another one. Right-click a bubble for **Select**, **Delete**, or **Open in Explorer**. Select checks and reveals its row. Delete validates that item and moves it directly to the Recycle Bin. Open in Explorer opens a folder or selects a file in its containing folder.
 
-Checkboxes mark items for a combined review. Protected Windows and app locations cannot be marked, and their checkbox says why. A completed removal shows its actual size, what was recycled or permanently deleted, and anything that stayed with its reason. [Selection and deletion](docs/selection-and-deletion.md) describes the checks.
+Checkboxes mark items for a combined Recycle Bin review. Protected items can be selected, but their deletion stays blocked. A completed removal shows its actual size and count, with **Back to selection** and **Home screen** actions. [Selection, deletion and animation details](docs/selection-and-deletion.md) describe the checks and motion behavior.
 
-Press **Enter** on a row to open its folder or reveal its file, **Space** to mark it and **Delete** to review it. Use **Alt+Left**, **Alt+Right**, **Alt+Up** or **Backspace** to navigate, and **Page Up**/**Page Down** to page the map. A new scan starts a fresh set of marks.
+Press **Enter** on a row to open its folder or reveal its file in File Explorer. Use **Alt+Left**, **Alt+Right**, and **Alt+Up** to navigate. A new scan starts a fresh set of marks.
 
 The map shows logical file sizes. The space a file takes up on disk can differ, especially for compressed, sparse, or hard-linked files. The capacity meter uses the space Windows reports for your account. Scan results stay in memory, and Disk Bubbles sends no telemetry.
 

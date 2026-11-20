@@ -20,7 +20,7 @@ Success: the user finds the big items within seconds of the scan finishing, and 
 
 ## Positioning
 
-A Windows counterpart to CleanMyMac's Space Lens: the size of a bubble is the size on disk, folders preview their contents inside them, and deletion is reviewed, reversible (Recycle Bin) and honest about every item.
+A Windows counterpart to CleanMyMac's Space Lens: the size of a bubble shows the size on disk, and deletion is reviewed, reversible (Recycle Bin) and honest about every item.
 
 ## Operating Context
 
@@ -30,9 +30,8 @@ A Windows counterpart to CleanMyMac's Space Lens: the size of a bubble is the si
 
 ## Capabilities and Constraints
 
-- Disk Scan: drive or folder scan, bubble map with drill-down, list beside the map, cross-folder marking, review and Recycle Bin move, success screen.
-- Bubble map follows Space Lens: largest items true to size, nested previews inside folders. When a folder has too many items to show legibly, the map pages, and the next page must be clearly signposted.
-- App Cleaner: installed-app inventory, uninstall, Deep Uninstall leftovers. Its workflow stays; it adopts the new look and the shared deletion engine.
+- Disk Scan: drive or folder scan, bubble map with drill-down (twelve bubbles per page with arrows), list beside the map, cross-folder marking, review and Recycle Bin move, success screen.
+- App Cleaner: installed-app inventory, uninstall, Deep Uninstall leftovers, sharing the deletion engine.
 - No telemetry, no account, no network service.
 - Protected Windows and app-managed locations are never offered for deletion.
 
@@ -40,6 +39,7 @@ A Windows counterpart to CleanMyMac's Space Lens: the size of a bubble is the si
 
 - Name: Disk Bubbles. Light and dark appearance, user switchable and remembered.
 - The bubble is the product's mark and its core visual.
+- The 10.5.1 look is the confirmed identity: cream and ink, charcoal, frosted panes, glass bubbles with a pink (light) or green (dark) reflection kept inside them. Polish stays within it; a replacement visual world was tried and rejected by the owner.
 
 ## Evidence on Hand
 

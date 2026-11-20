@@ -2,37 +2,15 @@
 
 ## 11.0.0
 
-### Deletion you can trust
-
 - Fix deletion reporting "Windows did not confirm the move" for items it had in fact moved, and never reaching the Deleted page. The old code called `ITransferSource::RecycleItem` directly and treated Windows' non-zero success codes as failures.
-- Move items with `IFileOperation`, the engine File Explorer uses, in one batch. Windows reports every item: moved to the Recycle Bin, permanently deleted, or kept, with a plain reason (in use by another app, access denied, changed or missing since review).
-- Remove the hang before deleting. Review no longer re-scans each selected folder and opens every file inside it twice; it checks the selected item itself, so a 40,000-file folder reviews in milliseconds instead of minutes.
-- Show a progress sheet while Windows works, with item, file and size counts. Large folders still take Windows a moment; the app never looks frozen.
-- Items too large for the Recycle Bin bring up the standard Windows permanent-delete prompt. Declining keeps the item and the result says why.
-- The Deleted page separates recycled from permanently deleted items, lists anything that stayed with its reason, and adds **Open Recycle Bin**.
-- A file edited after review, or a folder replaced by another of the same name, is not moved.
-
-### Space Lens map
-
-- Bubble area is exactly proportional to size within a page, packed with a front-chain circle packer into a cluster shaped to the map.
-- Folders preview their largest contents as smaller bubbles inside them.
-- A page holds as many items as stay legible. The rest gather into a **+N more** bubble and a pager with a clear **Next page** button. Page Up and Page Down also move between pages.
-- Selecting a row turns to the page that shows its bubble.
-
-### Liquid glass
-
-- A soft ambient light field sits behind translucent glass panes with specular rims, in both themes.
-- Bubbles are clearer glass with the content's colour pooled inside: folders in the theme's green or pink, with subtle tints for video, images, audio, archives, apps and documents. List rows carry the same tint.
-- The light behind the map shifts toward the colour of the bubble under the pointer.
-- Marked bubbles get an accent ring and check badge. The footer shows a selection tray with the marked size and a **Review & delete** button.
-- Glass buttons, round navigation buttons, keyboard-only focus rings, and refreshed start, scanning and empty states.
-
-### Other
-
-- Protected items can no longer be marked; their checkbox is disabled and explains why.
-- Bubble menu: Open, Mark for cleanup, Move to Recycle Bin, Open in File Explorer.
-- Space marks the selected row, Delete reviews it, Backspace goes up a folder.
-- Verification now moves real fixture files to the Recycle Bin, including a file held open by another process, and checks true-to-size bubble geometry.
+- Move items with `IFileOperation`, the engine File Explorer uses, in one batch. Windows reports every item: moved to the Recycle Bin, permanently deleted, or kept with a plain reason such as an app holding it open, access denied, or changed or missing since review.
+- Remove the hang before deleting. Review no longer re-scans each selected folder and opens every file inside it twice; it checks the selected item itself, so large folders review in milliseconds. The status line reports progress while Windows moves them.
+- Items too large for the Recycle Bin bring up the standard Windows permanent-delete prompt. Declining keeps the item and the results say why. The Deleted page says when items were permanently deleted.
+- A file edited after review, or a folder replaced by another of the same name, is not moved. A direct Delete on an item that fails its check now explains why instead of doing nothing.
+- Polish the glass: a soft contact shadow replaces the offset halo under bubbles, bubbles gain a specular sheen and glint, and panes a light top sheen. Small bubbles show their names.
+- Show focus rings for keyboard navigation only, keep the disabled delete button a quiet outline, give dark mode a distinct primary button, and lead the Deleted page with Back to selection.
+- Verification moves real fixture files to the Recycle Bin, including a file held open by another process.
+- Align the managed and manifest versions, which had drifted to 10.5.1 and 10.4.1.
 
 ## 10.5.1
 
