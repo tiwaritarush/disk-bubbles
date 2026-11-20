@@ -1,5 +1,13 @@
 # Changelog
 
+## 10.5.0
+
+- Make the whole checkbox column toggle selection and update checkmarks when a menu action selects an item.
+- Retain the last hovered bubble's row highlight and scroll its row into view. Protected items can be selected for review while deletion remains blocked.
+- Add Select and Delete above Open in Explorer. Delete validates and recycles only the clicked item.
+- Show confirmed removal totals with a native clay bin and glass bubble animation, plus Back to selection and Home screen. Stop rendering when hidden and respect reduced motion.
+- Keep the disk list themed while actions are busy. Reject deletion commands from an outdated scan.
+
 ## 10.4.3
 
 - Right-click a bubble to open its context menu and choose Open in Explorer. Folders open directly; files are selected in their containing folder.

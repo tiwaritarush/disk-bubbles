@@ -2,7 +2,7 @@
 
 Disk Bubbles shows where your Windows storage went. Scan a drive or folder and get a map sized by the files inside it. The biggest folders are easy to spot, and a click takes you straight into one.
 
-[Download 10.4.3 for Windows](https://github.com/tiwaritarush/disk-bubbles/releases/download/v10.4.3/DiskBubbles.exe) · [Release notes](https://github.com/tiwaritarush/disk-bubbles/releases/tag/v10.4.3) · [Build from source](#build-from-source) · [Report an issue](https://github.com/tiwaritarush/disk-bubbles/issues)
+[Download 10.5.0 for Windows](https://github.com/tiwaritarush/disk-bubbles/releases/download/v10.5.0/DiskBubbles.exe) · [Release notes](https://github.com/tiwaritarush/disk-bubbles/releases/tag/v10.5.0) · [Build from source](#build-from-source) · [Report an issue](https://github.com/tiwaritarush/disk-bubbles/issues)
 
 Windows 10 and 11 · Portable executable · C# and WPF · MIT
 
@@ -29,7 +29,11 @@ Screenshots use a disposable sample library and example app names.
 
 Get `DiskBubbles.exe` from the [releases page](https://github.com/tiwaritarush/disk-bubbles/releases) and run it on Windows 10 or 11 with .NET Framework 4.8 or later. It runs with your usual Windows permissions. The portable executable is unsigned, and the release includes a SHA-256 checksum for checking the download.
 
-Start with **Scan C:** or **Choose folder…**. Click a folder name or bubble to open it. Right-click any bubble and choose **Open in Explorer** to open its folder or select its file in Explorer. Use the checkbox to mark an item for Recycle Bin review. Press **Enter** on a row to open its folder or reveal its file in File Explorer. Use **Alt+Left**, **Alt+Right**, and **Alt+Up** to navigate. A new scan starts a fresh set of marks.
+Start with **Scan C:** or **Choose folder…**. Click a folder name or bubble to open it. The last bubble you hover stays highlighted in the list until you hover another one. Right-click a bubble for **Select**, **Delete**, or **Open in Explorer**. Select checks and reveals its row. Delete validates that item and moves it directly to the Recycle Bin. Open in Explorer opens a folder or selects a file in its containing folder.
+
+Checkboxes mark items for a combined Recycle Bin review. Protected items can be selected, but their deletion stays blocked. A completed removal shows its actual size and count, with **Back to selection** and **Home screen** actions. [Selection, deletion and animation details](docs/selection-and-deletion.md) describe the checks and motion behavior.
+
+Press **Enter** on a row to open its folder or reveal its file in File Explorer. Use **Alt+Left**, **Alt+Right**, and **Alt+Up** to navigate. A new scan starts a fresh set of marks.
 
 The map shows logical file sizes. The space a file takes up on disk can differ, especially for compressed, sparse, or hard-linked files. The capacity meter uses the space Windows reports for your account. Scan results stay in memory, and Disk Bubbles sends no telemetry.
 
