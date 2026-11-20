@@ -2,7 +2,7 @@
 
 Disk Bubbles shows where your Windows storage went. Scan a drive or folder and get a map sized by the files inside it. The biggest folders are easy to spot, and a click takes you straight into one.
 
-[Download 10.5.0 for Windows](https://github.com/tiwaritarush/disk-bubbles/releases/download/v10.5.0/DiskBubbles.exe) · [Release notes](https://github.com/tiwaritarush/disk-bubbles/releases/tag/v10.5.0) · [Build from source](#build-from-source) · [Report an issue](https://github.com/tiwaritarush/disk-bubbles/issues)
+[Download 10.5.1 for Windows](https://github.com/tiwaritarush/disk-bubbles/releases/download/v10.5.1/DiskBubbles.exe) · [Release notes](https://github.com/tiwaritarush/disk-bubbles/releases/tag/v10.5.1) · [Build from source](#build-from-source) · [Report an issue](https://github.com/tiwaritarush/disk-bubbles/issues)
 
 Windows 10 and 11 · Portable executable · C# and WPF · MIT
 

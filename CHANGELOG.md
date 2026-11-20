@@ -1,5 +1,11 @@
 # Changelog
 
+## 10.5.1
+
+- Allow customized Downloads and other ordinary folders to pass deletion checks when they contain `desktop.ini` or thumbnail metadata. Keep critical Windows paths, app-managed locations, system files and unverified links protected.
+- Open filesystem locations through Windows Shell item IDs instead of Explorer command-line arguments. Select files precisely, handle special characters, and report missing or changed locations without falling back to Home.
+- Verify customized-folder review and native Shell path resolution, including the actual Downloads folder and filenames containing commas and Unicode.
+
 ## 10.5.0
 
 - Make the whole checkbox column toggle selection and update checkmarks when a menu action selects an item.
