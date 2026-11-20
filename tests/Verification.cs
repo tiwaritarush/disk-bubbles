@@ -233,6 +233,7 @@ internal static class Verification
                 Assert((long)result.GetType().GetField("VolumeBytes").GetValue(result) > 0, "Volume capacity was unavailable.");
                 var packed = (IList)map.GetType().GetField("_bubbles", PrivateInstance).GetValue(map);
                 Assert(packed.Count == 12, "Map uses the wrong number of bubbles.");
+                VerifyBubbleMenu(window, map, entries, fixture);
                 var frontLayer = map.GetType().GetField("_front", PrivateInstance);
                 var artwork = frontLayer.FieldType.GetProperty("Artwork");
                 var originalArtwork = artwork.GetValue(frontLayer.GetValue(map));
@@ -711,6 +712,28 @@ internal static class Verification
             registered.SetValue(other, false);
             command.SetValue(other, null);
         }
+    }
+
+    private static void VerifyBubbleMenu(Window window, FrameworkElement map, ListBox entries, string folder)
+    {
+        var build = window.GetType().GetMethod("BuildBubbleMenu", PrivateInstance);
+        Assert(build != null, "Bubbles do not offer an Explorer context menu.");
+        string pathBefore = ((TextBlock)WindowField(window, "_path")).Text;
+        string marksBefore = ((TextBlock)WindowField(window, "_selectionSummary")).Text;
+        foreach (string name in new[] { "Projects", "Report.pdf", "Windows" })
+        {
+            object entry = entries.Items.Cast<object>().Single(item => EntryName(item) == name);
+            var menu = (ContextMenu)build.Invoke(window, new[] { entry });
+            Assert(menu != null && menu.Items.Count == 1 && menu.PlacementTarget == map, "Bubble menu is missing or targets another control.");
+            var open = menu.Items[0] as MenuItem;
+            Assert(open != null && Equals(open.Header, "Open in Explorer") && open.IsEnabled &&
+                Equals(open.ToolTip, Path.Combine(folder, name)), "Explorer menu points to the wrong item or blocks browsing a protected folder.");
+        }
+        object invalid = Activator.CreateInstance(entries.Items[0].GetType(), new object[] { "../outside.txt", null, 0L });
+        Assert(build.Invoke(window, new[] { invalid }) == null, "Bubble menu accepted a path outside the scanned folder.");
+        Assert(((TextBlock)WindowField(window, "_path")).Text == pathBefore &&
+            ((TextBlock)WindowField(window, "_selectionSummary")).Text == marksBefore,
+            "Building a bubble menu navigated or changed Recycle Bin marks.");
     }
 
     private static void VerifyScanWorkers(Assembly assembly, string fixture)

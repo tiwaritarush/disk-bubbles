@@ -134,6 +134,12 @@ namespace DiskBubbles
             _mapNext.Click += (sender, args) => ChangeMapPage(_map.Page + 1);
             _rescan.Click += async (sender, args) => await ScanAsync(_rootPath);
             _map.Activated += Activate;
+            _map.ContextRequested += entry =>
+            {
+                ContextMenu menu = BuildBubbleMenu(entry);
+                if (menu != null)
+                    menu.IsOpen = true;
+            };
             _map.BackgroundActivated += () => Navigate(_trail.Count - 2);
             _map.HoverChanged += entry =>
             {
@@ -557,6 +563,18 @@ namespace DiskBubbles
             }
 
             OpenFileInExplorer(entry);
+        }
+
+        private ContextMenu BuildBubbleMenu(DiskEntry entry)
+        {
+            if (_trail.Count == 0 || !NativeDirectoryReader.IsEntryName(entry.Name))
+                return null;
+            string path = IOPath.Combine(CurrentPath(), entry.Name);
+            var open = new MenuItem { Header = "Open in Explorer", ToolTip = path };
+            open.Click += (sender, args) => OpenExplorer(entry.IsFolder ? "\"" + path + "\"" : "/select,\"" + path + "\"");
+            var menu = new ContextMenu { PlacementTarget = _map, Placement = PlacementMode.MousePoint, FontSize = 14 };
+            menu.Items.Add(open);
+            return menu;
         }
 
         private void OpenFileInExplorer(DiskEntry entry)

@@ -141,6 +141,7 @@ namespace DiskBubbles
         }
 
         public event Action<DiskEntry> Activated;
+        public event Action<DiskEntry> ContextRequested;
         public event Action<DiskEntry> HoverChanged;
         public event Action BackgroundActivated;
         public int VisibleCount => _bubbles.Count;
@@ -662,6 +663,20 @@ namespace DiskBubbles
             if (pressed == Hit(position) || (_transitioning && remainedInPlace))
                 Activated?.Invoke(pressed);
             return true;
+        }
+
+        protected override void OnMouseRightButtonUp(MouseButtonEventArgs args)
+        {
+            base.OnMouseRightButtonUp(args);
+            DiskEntry entry = Hit(args.GetPosition(this));
+            if (entry == null)
+                return;
+            _pressed = null;
+            _backgroundDown = false;
+            ToolTip = null;
+            UpdateHighlight();
+            ContextRequested?.Invoke(entry);
+            args.Handled = true;
         }
 
         private DiskEntry Hit(Point position)
