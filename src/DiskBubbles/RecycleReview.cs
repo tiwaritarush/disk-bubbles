@@ -46,7 +46,7 @@ namespace DiskBubbles
             long bytes = items.Where(item => item.Ready).Aggregate(0L, (total, item) => DiskScanner.AddBytes(total, item.Entry.Bytes));
             string summary = completed ? (items.Count == 1 ? "1 item needs attention" : $"{items.Count:N0} items need attention") :
                 ready == 0 ? "Windows could not verify any selected items for recycling." :
-                $"{ready:N0} moving · {DiskEntry.FormatSize(bytes)}" + (items.Count > ready ? $"  ·  {items.Count - ready:N0} staying in place" : "");
+                $"{ready:N0} ready to move · {DiskEntry.FormatSize(bytes)}";
             var status = Label(summary, 13, "Muted");
             status.Margin = new Thickness(0, 3, 0, 0);
             headingText.Children.Add(status);
@@ -104,7 +104,7 @@ namespace DiskBubbles
                 content.Children.Add(previewPanel);
             }
 
-            var list = new ListBox { ItemsSource = items.OrderByDescending(item => item.Ready).ToList(), BorderThickness = new Thickness(0), Background = Brushes.Transparent,
+            var list = new ListBox { ItemsSource = items, BorderThickness = new Thickness(0), Background = Brushes.Transparent,
                 ItemTemplate = (DataTemplate)FindResource("RecycleEntry"), Padding = new Thickness(6) };
             list.SetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Disabled);
             list.SetValue(VirtualizingPanel.VirtualizationModeProperty, VirtualizationMode.Recycling);

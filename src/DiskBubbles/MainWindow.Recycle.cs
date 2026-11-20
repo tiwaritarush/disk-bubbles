@@ -32,7 +32,7 @@ namespace DiskBubbles
             else
                 _marked.Remove(entry);
             UpdateMarks();
-            UiMotion.Acknowledge(_selectionTray);
+            UiMotion.Acknowledge(_selectionSummary);
         }
 
         private void ClearMarks()
@@ -40,20 +40,18 @@ namespace DiskBubbles
             foreach (var entry in _marked.Keys)
                 entry.IsMarked = false;
             _marked.Clear();
+            _entries.Items.Refresh();
             UpdateMarks();
         }
 
-        /// <summary>Marked items that are not already covered by a marked parent folder.</summary>
         private IEnumerable<MarkedEntry> MarkedRoots() => _marked.Values.Where(mark => !mark.Parents.Any(_marked.ContainsKey));
 
         private void UpdateMarks()
         {
-            var roots = MarkedRoots().ToArray();
-            long bytes = roots.Aggregate(0L, (total, mark) => DiskScanner.AddBytes(total, mark.Entry.Bytes));
-            _selectionCount.Text = CountLabel(roots.Length, "item") + " marked";
-            _selectionSize.Text = DiskEntry.FormatSize(bytes);
-            _reviewRecycle.IsEnabled = _clearMarks.IsEnabled = roots.Length > 0 && !_recycleBusy;
-            UiMotion.Reveal(_selectionTray, roots.Length > 0);
+            long bytes = MarkedRoots().Aggregate(0L, (total, mark) => DiskScanner.AddBytes(total, mark.Entry.Bytes));
+            _selectionSummary.Text = _marked.Count == 0 ? "No items marked" : $"{CountLabel(_marked.Count, "item")} marked · {DiskEntry.FormatSize(bytes)}";
+            _reviewRecycle.IsEnabled = _clearMarks.IsEnabled = _marked.Count > 0;
+            _clearMarks.Visibility = _marked.Count > 0 ? Visibility.Visible : Visibility.Hidden;
             UpdateSelection();
         }
 
@@ -70,9 +68,10 @@ namespace DiskBubbles
             using var cancellation = new CancellationTokenSource();
             _recycleCheck = cancellation;
             SetRecycleBusy(true);
-            _work.Show("Checking items", "Esc to cancel");
+            _status.Text = "Checking selected items…  ·  Esc to cancel";
             try
             {
+                // Review checks each selected item itself; it never re-scans folder contents, so it is instant.
                 List<RecycleItem> items = await Task.Run(() => selection.GroupBy(mark => mark.Parent)
                     .SelectMany(group => RecycleItem.Prepare(group.First().Folder, group.Select(mark => mark.Entry), cancellation.Token))
                     .ToList());
@@ -80,54 +79,46 @@ namespace DiskBubbles
                 _recycleCheck = null;
                 if (_closed)
                     return;
+
                 if (items.Any(item => item.NeedsRescan))
                     _result.NeedsRefresh = true;
+                DiskEntry current = _trail[_trail.Count - 1];
+                DiskEntry projection = selection.All(mark => mark.Parents.Contains(current)) ? current : null;
+                if (review && new RecycleReview(this, items, projection, _result.Root).ShowDialog() != true)
+                    return;
 
                 RecycleItem[] ready = items.Where(item => item.Ready).ToArray();
-                if (review)
+                if (ready.Length > 0)
                 {
-                    _work.Hide();
-                    DiskEntry current = _trail[_trail.Count - 1];
-                    DiskEntry projection = selection.All(mark => mark.Parents.Contains(current)) ? current : null;
-                    if (new RecycleReview(this, items, projection, _result.Root).ShowDialog() != true)
-                        return;
-                }
-                else if (ready.Length == 0)
-                {
-                    _work.Hide();
-                    new RecycleReview(this, items, null, null, completed: true).ShowDialog();
-                    return;
+                    _movingToBin = true;
+                    long files = ready.Sum(item => item.Files);
+                    string scope = $"{CountLabel(ready.Length, "item")} · {CountLabel(files, "file")}";
+                    _status.Text = $"Moving to the Recycle Bin…  ·  {scope}";
+                    var progress = new Progress<RecycleProgress>(step =>
+                    {
+                        double fraction = step.Total == 0 ? 0 : Math.Max(step.Fraction, (double)step.Done / step.Total);
+                        _status.Text = $"Moving to the Recycle Bin…  ·  {step.Done:N0} of {step.Total:N0} done" +
+                            (fraction > 0.001 ? $"  ·  {fraction:P0}" : $"  ·  {scope}");
+                    });
+                    await RecycleBin.MoveAsync(ready, new WindowInteropHelper(this).Handle, progress);
+                    _movingToBin = false;
                 }
 
-                _movingToBin = true;
-                long readyBytes = ready.Aggregate(0L, (total, item) => DiskScanner.AddBytes(total, item.Entry.Bytes));
-                long readyFiles = ready.Sum(item => item.Files);
-                string scope = $"{CountLabel(ready.Length, "item")} · {CountLabel(readyFiles, "file")} · {DiskEntry.FormatSize(readyBytes)}";
-                _work.Show("Moving to the Recycle Bin", scope + (readyFiles > 5000 ? "\nWindows checks every file first, so large folders take a moment." : ""));
-                var progress = new Progress<RecycleProgress>(step =>
-                {
-                    double fraction = step.Total == 0 ? 0 : Math.Max(step.Fraction, (double)step.Done / step.Total);
-                    string detail = step.Current == null ? scope : $"{step.Done:N0} of {step.Total:N0} done · {step.Current}";
-                    _work.Show("Moving to the Recycle Bin", detail, fraction > 0.001 ? fraction : (double?)null);
-                });
-                await RecycleBin.MoveAsync(ready, new WindowInteropHelper(this).Handle, progress);
-                _movingToBin = false;
-                _work.Hide();
-
-                RecycleItem[] removed = ready.Where(item => item.Removed).ToArray();
-                RecycleItem[] stayed = ready.Where(item => !item.Removed).ToArray();
-                if (stayed.Any(item => item.NeedsRescan) || (removed.Length > 0 && ScannedRecycleBin()))
+                RecycleItem[] moved = ready.Where(item => item.Removed).ToArray();
+                // A direct Delete has no review, so an item that failed its check is reported here too.
+                RecycleItem[] failures = (review ? ready : items.ToArray()).Where(item => !item.Removed).ToArray();
+                if (failures.Any(item => item.NeedsRescan) || (moved.Length > 0 && ScannedRecycleBin()))
                     _result.NeedsRefresh = true;
-                if (removed.Length > 0)
+                if (moved.Length > 0)
                 {
-                    ApplyRecycled(removed, selection);
+                    ApplyRecycled(moved, selection);
                     refreshed = true;
-                    ShowRecycleSuccess(removed, stayed);
                 }
-                else if (stayed.Length > 0)
-                {
-                    new RecycleReview(this, stayed, null, null, completed: true).ShowDialog();
-                }
+
+                if (failures.Length > 0)
+                    new RecycleReview(this, failures, _trail[_trail.Count - 1], _result.Root, completed: true).ShowDialog();
+                if (moved.Length > 0)
+                    ShowRecycleSuccess(moved);
             }
             catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
             {
@@ -135,7 +126,7 @@ namespace DiskBubbles
             catch (Exception error) when (RecycleBin.IsItemError(error))
             {
                 if (!_closed)
-                    UiVisuals.Notice(this, "Couldn’t check these items", error.Message).ShowDialog();
+                    UiVisuals.Notice(this, "Can’t review these items", error.Message).ShowDialog();
             }
             finally
             {
@@ -143,7 +134,6 @@ namespace DiskBubbles
                 _movingToBin = false;
                 if (!_closed)
                 {
-                    _work.Hide();
                     SetRecycleBusy(false);
                     if (!refreshed)
                         UpdateScanStatus();
@@ -154,16 +144,17 @@ namespace DiskBubbles
         private void SetRecycleBusy(bool busy)
         {
             _recycleBusy = busy;
-            _appsMode.IsEnabled = _diskMode.IsEnabled = !busy;
+            _appsMode.IsEnabled = !busy;
+            _diskMode.IsEnabled = !busy;
             _browser.IsEnabled = _folder.IsEnabled = _drive.IsEnabled = !busy;
-            UpdateMarks();
         }
 
-        private void ShowRecycleSuccess(IReadOnlyList<RecycleItem> removed, IReadOnlyList<RecycleItem> stayed)
+        private void ShowRecycleSuccess(IReadOnlyList<RecycleItem> moved)
         {
-            if (removed.Count == 0)
+            if (moved.Count == 0)
                 return;
-            _completed.ShowResult(removed, stayed);
+            long bytes = moved.Aggregate(0L, (total, item) => DiskScanner.AddBytes(total, item.Entry.Bytes));
+            _completed.ShowResult(bytes, moved.Count, moved.Count(item => item.Outcome == RecycleOutcome.Deleted));
             ShowPage(_completed);
         }
 
@@ -171,9 +162,9 @@ namespace DiskBubbles
             string.Equals(_rootPath, IOPath.GetPathRoot(_rootPath), StringComparison.OrdinalIgnoreCase) &&
             _result.Root.Children.Any(entry => entry.Name.Equals("$Recycle.Bin", StringComparison.OrdinalIgnoreCase));
 
-        /// <summary>Removes confirmed items from the in-memory scan and updates every affected total.</summary>
         private void ApplyRecycled(IReadOnlyList<RecycleItem> moved, IReadOnlyList<MarkedEntry> selection)
         {
+            _entries.ItemsSource = null;
             var removed = new HashSet<DiskEntry>(moved.Select(item => item.Entry));
             var changes = new Dictionary<DiskEntry, (int Depth, long Bytes, HashSet<DiskEntry> Children)>();
             foreach (var mark in selection.Where(mark => removed.Contains(mark.Entry)))
@@ -189,7 +180,6 @@ namespace DiskBubbles
                 }
             }
 
-            // Deepest folders first, so each parent re-sorts children whose sizes are already final.
             foreach (var item in changes.OrderByDescending(item => item.Value.Depth))
             {
                 DiskEntry folder = item.Key;
@@ -221,6 +211,7 @@ namespace DiskBubbles
                 _trail = _trail.GetRange(0, removedLevel);
             _map.InvalidateLayout(changes.Keys);
             RefreshBrowser();
+            _status.Text += $"  ·  {moved.Count:N0} removed";
         }
 
         private static void PruneHistory(Stack<List<DiskEntry>> history, HashSet<DiskEntry> removed)

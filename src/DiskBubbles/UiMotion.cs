@@ -53,52 +53,9 @@ namespace DiskBubbles
             if (!SystemParameters.ClientAreaAnimation)
                 return;
 
-            if (element.Visibility != Visibility.Visible)
-                return;
             var acknowledgment = Ease(Math.Min(0.79, element.Opacity), 1, 125);
             acknowledgment.FillBehavior = FillBehavior.Stop;
             element.BeginAnimation(UIElement.OpacityProperty, acknowledgment);
-        }
-
-        /// <summary>Shows or hides an element with a short rise, settling to a plain visible or collapsed state.</summary>
-        public static void Reveal(FrameworkElement element, bool show)
-        {
-            bool shown = element.Visibility == Visibility.Visible && !(element.Tag is string hiding && hiding == "hiding");
-            if (show == shown)
-                return;
-            if (!(element.RenderTransform is TranslateTransform offset))
-                element.RenderTransform = offset = new TranslateTransform();
-            element.BeginAnimation(UIElement.OpacityProperty, null);
-            offset.BeginAnimation(TranslateTransform.YProperty, null);
-            if (!SystemParameters.ClientAreaAnimation || !element.IsLoaded)
-            {
-                element.Tag = null;
-                element.Opacity = 1;
-                offset.Y = 0;
-                element.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-                return;
-            }
-            if (show)
-            {
-                element.Tag = null;
-                element.Visibility = Visibility.Visible;
-                element.BeginAnimation(UIElement.OpacityProperty, Ease(0, 1, RevealMs));
-                offset.BeginAnimation(TranslateTransform.YProperty, Ease(10, 0, RevealMs));
-                return;
-            }
-            element.Tag = "hiding";
-            var fade = Ease(element.Opacity, 0, DialogExitMs, leaving: true);
-            fade.Completed += (sender, args) =>
-            {
-                if (!(element.Tag is string state) || state != "hiding")
-                    return;
-                element.Tag = null;
-                element.Visibility = Visibility.Collapsed;
-                element.BeginAnimation(UIElement.OpacityProperty, null);
-                element.Opacity = 1;
-            };
-            element.BeginAnimation(UIElement.OpacityProperty, fade);
-            offset.BeginAnimation(TranslateTransform.YProperty, Ease(0, 6, DialogExitMs, leaving: true));
         }
     }
 

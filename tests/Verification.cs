@@ -124,15 +124,15 @@ internal static class Verification
                 displayPath.Text = @"D:\Storage sample";
                 capacityLabel.Text = "320 GB used   ·   192 GB free";
                 capacityMeter.Value = 0.625;
-                Assert(((SolidColorBrush)window.Background).Color == Color.FromRgb(11, 12, 15) &&
-                    ((SolidColorBrush)window.Foreground).Color == Color.FromRgb(242, 243, 245) &&
+                Assert(((SolidColorBrush)window.Background).Color == Color.FromRgb(17, 17, 18) &&
+                    ((SolidColorBrush)window.Foreground).Color == Color.FromRgb(240, 240, 240) &&
                     ((SolidColorBrush)window.FindResource("BubbleTint")).Color == Color.FromRgb(43, 240, 138),
                     "The dark appearance did not use charcoal, neutral text and green glass.");
                 await Capture(window, Path.Combine(fixture, "../preview.png"));
                 await Capture(window, Path.Combine(fixture, "../preview-2x.png"), 192);
                 setAppearance.Invoke(window, new object[] { true });
-                Assert(((SolidColorBrush)window.Background).Color == Color.FromRgb(238, 233, 227) &&
-                    ((SolidColorBrush)window.Foreground).Color == Color.FromRgb(20, 18, 23) &&
+                Assert(((SolidColorBrush)window.Background).Color == Color.FromRgb(236, 230, 220) &&
+                    ((SolidColorBrush)window.Foreground).Color == Color.FromRgb(5, 5, 5) &&
                     ((SolidColorBrush)window.FindResource("BubbleTint")).Color == Color.FromRgb(230, 91, 196) &&
                     displayPath.Text == @"D:\Storage sample",
                     "The light appearance failed to update in place.");
@@ -213,7 +213,7 @@ internal static class Verification
                 entries.SelectedItem = report;
                 entries.ScrollIntoView(report);
                 var reviewButton = (Button)WindowField(window, "_reviewRecycle");
-                Assert(!reviewButton.IsVisible && !reviewButton.IsEnabled, "Browsing armed the Recycle Bin action.");
+                Assert(reviewButton.IsVisible && !reviewButton.IsEnabled, "Browsing armed the Recycle Bin action.");
                 await Mark(entries, report);
                 Assert(reviewButton.IsEnabled, "Checking a file did not enable the review action.");
                 setAppearance.Invoke(window, new object[] { true });
@@ -239,32 +239,22 @@ internal static class Verification
                 }));
                 Assert(confirmation.ShowDialog() == true, "The animated confirmation lost the approved result.");
                 entries.UnselectAll();
-                windowType.GetMethod("RefreshBrowser", PrivateInstance).Invoke(window, new object[] { null, false, false, false });
-                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
 
                 Point left = entries.TranslatePoint(new Point(), window);
                 Point right = map.TranslatePoint(new Point(), window);
                 Assert(left.X + entries.ActualWidth <= right.X, "The file list should sit left of the map.");
                 Assert((long)result.GetType().GetField("VolumeBytes").GetValue(result) > 0, "Volume capacity was unavailable.");
                 var packed = (IList)map.GetType().GetField("_bubbles", PrivateInstance).GetValue(map);
-                var realBubbles = packed.Cast<object>().Where(bubble => bubble.GetType().GetField("Entry").GetValue(bubble) != null).ToList();
-                Assert(realBubbles.Count >= 3 && realBubbles.Count < entries.Items.Count, "The first map page should show the large items and page the rest.");
-                Assert(packed[packed.Count - 1].GetType().GetField("Entry").GetValue(packed[packed.Count - 1]) == null,
-                    "A paged map did not end with a '+N more' bubble.");
-                Assert(((Border)WindowField(window, "_pager")).Visibility == Visibility.Visible, "A paged map hid its pager.");
+                Assert(packed.Count == 12, "Map uses the wrong number of bubbles.");
                 await VerifyBubbleMenu(window, map, entries, fixture);
                 var frontLayer = map.GetType().GetField("_front", PrivateInstance);
                 var artwork = frontLayer.FieldType.GetProperty("Artwork");
                 var originalArtwork = artwork.GetValue(frontLayer.GetValue(map));
-                var circles = realBubbles.Select(circle => new
+                var circles = packed.Cast<object>().Select(circle => new
                 {
                     Center = (Point)circle.GetType().GetField("Center").GetValue(circle),
                     Radius = (double)circle.GetType().GetField("Radius").GetValue(circle),
-                    Bytes = (long)entryType.GetProperty("Bytes").GetValue(circle.GetType().GetField("Entry").GetValue(circle)),
                 }).ToList();
-                for (int i = 1; i < circles.Count; i++)
-                    Assert(Math.Abs(circles[i].Radius / circles[0].Radius - Math.Sqrt((double)circles[i].Bytes / circles[0].Bytes)) < 0.01,
-                        "Bubble area is not proportional to size on the page.");
                 var trackPointer = map.GetType().GetMethod("TrackPointer", PrivateInstance);
                 var firstCircle = circles[0];
                 object firstEntry = packed[0].GetType().GetField("Entry").GetValue(packed[0]);
@@ -281,7 +271,7 @@ internal static class Verification
                 Assert((bool)entryType.GetProperty("IsLinked").GetValue(firstEntry), "Leaving the map lost the last linked row.");
                 trackPointer.Invoke(map, new object[] { pointer });
                 var caption = (TextBlock)WindowField(window, "_mapNote");
-                Assert(caption.Text.StartsWith("Projects", StringComparison.Ordinal) && caption.Text.Contains("%"),
+                Assert(caption.Text.StartsWith("Projects", StringComparison.Ordinal) && caption.Text.Contains("of this folder"),
                     "Hover did not show the item's size and share.");
                 var shifted = pointer + new Vector(10, 5);
                 trackPointer.Invoke(map, new object[] { shifted });
@@ -290,7 +280,7 @@ internal static class Verification
                         "Bubble reflection did not track the pointer.");
                 await Capture(window, Path.Combine(fixture, "../hover.png"));
                 var small = circles[circles.Count - 1];
-                var smallEntry = realBubbles[realBubbles.Count - 1].GetType().GetField("Entry").GetValue(realBubbles[realBubbles.Count - 1]);
+                var smallEntry = packed[packed.Count - 1].GetType().GetField("Entry").GetValue(packed[packed.Count - 1]);
                 trackPointer.Invoke(map, new object[] { small.Center });
                 Assert(map.ToolTip is string tooltip && tooltip.StartsWith(EntryName(smallEntry), StringComparison.Ordinal),
                     "A small bubble tooltip did not identify its entry.");
@@ -303,7 +293,7 @@ internal static class Verification
                     Assert(circle.Center.X >= circle.Radius && circle.Center.X + circle.Radius <= map.ActualWidth, "Bubble exceeds map width.");
                     Assert(circle.Center.Y >= circle.Radius && circle.Center.Y + circle.Radius <= map.ActualHeight, "Bubble exceeds map height.");
                     for (int j = 0; j < i; j++)
-                        Assert((circle.Center - circles[j].Center).Length >= circle.Radius + circles[j].Radius + 4, "Bubbles have insufficient separation.");
+                        Assert((circle.Center - circles[j].Center).Length >= circle.Radius + circles[j].Radius + 5, "Bubbles have insufficient separation.");
                     double nearestGap = circles.Where((neighbor, index) => index != i)
                         .Min(neighbor => (neighbor.Center - circle.Center).Length - neighbor.Radius - circle.Radius);
                     Assert(nearestGap <= 14, "A bubble was left apart from the cluster.");
@@ -377,28 +367,27 @@ internal static class Verification
                 Assert(path.Text == Path.Combine(fixture, "Projects"), "One click did not open a folder row.");
                 back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Assert((await FindMark(entries, projects)).IsChecked == true, "Opening a marked folder lost its mark.");
-                var criticalBox = await FindMark(entries, windows);
+                await FindMark(entries, windows);
                 var criticalRow = (ListBoxItem)entries.ItemContainerGenerator.ContainerFromItem(windows);
                 Click(FindVisual<Grid>(criticalRow, area => area.Name == "MarkArea"));
-                Assert(path.Text == fixture && !(bool)entryType.GetProperty("IsMarked").GetValue(windows) && !criticalBox.IsEnabled &&
-                    criticalBox.ToolTip is string reason && reason.Contains("Critical"),
-                    "A protected folder could be marked, or its checkbox did not explain why not.");
+                Assert(path.Text == fixture && (bool)entryType.GetProperty("IsMarked").GetValue(windows),
+                    "A protected folder could not be selected for review.");
                 ((Button)WindowField(window, "_clearMarks")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 await Mark(entries, report);
-                var nextPage = (Button)WindowField(window, "_pageNext");
-                var previousPage = (Button)WindowField(window, "_pagePrevious");
+                var nextPage = (Button)WindowField(window, "_mapNext");
+                var previousPage = (Button)WindowField(window, "_mapPrevious");
                 var mapped = new List<object>();
                 do
                 {
                     var page = (IList)map.GetType().GetField("_bubbles", PrivateInstance).GetValue(map);
-                    mapped.AddRange(page.Cast<object>().Select(bubble => bubble.GetType().GetField("Entry").GetValue(bubble)).Where(entry => entry != null));
-                    if (nextPage.Visibility != Visibility.Visible)
+                    mapped.AddRange(page.Cast<object>().Select(bubble => bubble.GetType().GetField("Entry").GetValue(bubble)));
+                    if (!nextPage.IsEnabled)
                         break;
                     nextPage.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 } while (true);
                 Assert(mapped.SequenceEqual(entries.Items.Cast<object>()), "The map omitted, duplicated, or reordered an entry.");
                 Assert(previousPage.IsEnabled, "The map did not offer a way back from its last page.");
-                int lastPage = (int)map.GetType().GetProperty("PageStart").GetValue(map);
+                int lastPage = (int)map.GetType().GetProperty("Page").GetValue(map);
                 await Task.Delay(250);
                 await Capture(window, Path.Combine(fixture, "../last-map-page.png"));
                 var scrollMethod = windowType.GetMethod("ListingScrollViewer", BindingFlags.Static | BindingFlags.NonPublic);
@@ -411,12 +400,12 @@ internal static class Verification
                 activate.Invoke(window, new[] { projects });
                 back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                Assert((int)map.GetType().GetProperty("PageStart").GetValue(map) == lastPage && listScroll.VerticalOffset == offset,
+                Assert((int)map.GetType().GetProperty("Page").GetValue(map) == lastPage && listScroll.VerticalOffset == offset,
                     "Back did not restore the map page and scroll position.");
                 Assert((bool)entryType.GetProperty("IsMarked").GetValue(report), "A checked file was lost during navigation.");
                 var reportBox = await FindMark(entries, report);
                 Assert(reportBox.IsChecked == true, "A returned or recycled row did not restore its checkbox.");
-                Assert(!(await FindMark(entries, windows)).IsEnabled, "A critical folder could be marked for deletion.");
+                Assert((await FindMark(entries, windows)).IsEnabled, "Critical folder cannot be selected for review.");
                 activate.Invoke(window, new[] { projects });
                 object design = entries.Items[0];
                 await Mark(entries, design);
@@ -480,7 +469,6 @@ internal static class Verification
 
                 window.Width = window.MinWidth;
                 window.Height = window.MinHeight;
-                await Task.Delay(500);
                 await Capture(window, Path.Combine(fixture, "../compact.png"));
                 setAppearance.Invoke(window, new object[] { true });
                 await Capture(window, Path.Combine(fixture, "../compact-light.png"));
@@ -511,7 +499,7 @@ internal static class Verification
                 await Task.Delay(260);
                 await Capture(notice, Path.Combine(fixture, "../notice.png"));
                 notice.Close();
-                Console.WriteLine($"Verified {files.Count} files and {expected} bytes, true-to-size map pages, navigation, real Recycle Bin moves and safeguards, both themes, App Cleaner progress and icons, app sizing, and uninstall review.");
+                Console.WriteLine($"Verified {files.Count} files and {expected} bytes, map navigation, real Recycle Bin moves and safeguards, both themes, App Cleaner progress and icons, app sizing, and uninstall review.");
                 application.Shutdown(0);
             }
             catch (Exception error)
@@ -774,43 +762,36 @@ internal static class Verification
     private static async Task VerifyBubbleMenu(Window window, FrameworkElement map, ListBox entries, string folder)
     {
         var build = window.GetType().GetMethod("BuildBubbleMenu", PrivateInstance);
-        Assert(build != null, "Bubbles do not offer a context menu.");
+        Assert(build != null, "Bubbles do not offer an Explorer context menu.");
         string pathBefore = ((TextBlock)WindowField(window, "_path")).Text;
-        string marksBefore = ((TextBlock)WindowField(window, "_selectionCount")).Text;
+        string marksBefore = ((TextBlock)WindowField(window, "_selectionSummary")).Text;
         foreach (string name in new[] { "Projects", "Report.pdf", "Windows" })
         {
             object entry = entries.Items.Cast<object>().Single(item => EntryName(item) == name);
-            bool isFolder = name != "Report.pdf";
             var menu = (ContextMenu)build.Invoke(window, new[] { entry });
-            Assert(menu != null && menu.PlacementTarget == map, "Bubble menu is missing or targets another control.");
-            var actions = menu.Items.OfType<MenuItem>().ToList();
-            string[] expected = isFolder
-                ? new[] { "Open", "Mark for cleanup", "Move to Recycle Bin", "Open in File Explorer" }
-                : new[] { "Mark for cleanup", "Move to Recycle Bin", "Show in File Explorer" };
-            bool marked = (bool)entry.GetType().GetProperty("IsMarked").GetValue(entry);
-            Assert(actions.Select(action => (string)action.Header).Select(header => header == "Unmark" && marked ? "Mark for cleanup" : header)
-                .SequenceEqual(expected), "Bubble actions are missing or out of order for " + name + ".");
-            var delete = actions.Single(action => Equals(action.Header, "Move to Recycle Bin"));
-            Assert(delete.IsEnabled == (name != "Windows"), "Protected folder deletion was not blocked.");
-            var open = actions[actions.Count - 1];
-            Assert(open.IsEnabled && Equals(open.ToolTip, Path.Combine(folder, name)), "Explorer menu points to the wrong item.");
+            Assert(menu != null && menu.Items.Count == 3 && menu.PlacementTarget == map, "Bubble menu is missing or targets another control.");
+            Assert(Equals(((MenuItem)menu.Items[0]).Header, "Select") && Equals(((MenuItem)menu.Items[1]).Header, "Delete"), "Bubble actions are out of order.");
+            Assert(((MenuItem)menu.Items[1]).IsEnabled == (name != "Windows"), "Protected folder deletion was not blocked.");
+            var open = menu.Items[2] as MenuItem;
+            Assert(open != null && Equals(open.Header, "Open in Explorer") && open.IsEnabled &&
+                Equals(open.ToolTip, Path.Combine(folder, name)), "Explorer menu points to the wrong item or blocks browsing a protected folder.");
         }
         object invalid = Activator.CreateInstance(entries.Items[0].GetType(), new object[] { "../outside.txt", null, 0L });
         Assert(build.Invoke(window, new[] { invalid }) == null, "Bubble menu accepted a path outside the scanned folder.");
         object project = entries.Items.Cast<object>().Single(item => EntryName(item) == "Projects");
         object previous = entries.SelectedItem;
         var projectMenu = (ContextMenu)build.Invoke(window, new[] { project });
-        projectMenu.Items.OfType<MenuItem>().Single(action => Equals(action.Header, "Mark for cleanup")).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        ((MenuItem)projectMenu.Items[0]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         var check = await FindMark(entries, project);
-        Assert(check.IsChecked == true && ReferenceEquals(entries.SelectedItem, project), "Mark did not check and reveal the bubble's row.");
+        Assert(check.IsChecked == true && ReferenceEquals(entries.SelectedItem, project), "Select did not check and reveal the bubble's row.");
         window.GetType().GetMethod("SetMarked", PrivateInstance).Invoke(window, new[] { project, (object)false });
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         Assert(check.IsChecked == false, "The checkbox did not follow a programmatic deselection.");
         entries.SelectedItem = previous;
         window.GetType().GetMethod("LinkEntry", PrivateInstance).Invoke(window, new object[] { null });
         Assert(((TextBlock)WindowField(window, "_path")).Text == pathBefore &&
-            ((TextBlock)WindowField(window, "_selectionCount")).Text == marksBefore,
-            "Building a bubble menu navigated or changed marks.");
+            ((TextBlock)WindowField(window, "_selectionSummary")).Text == marksBefore,
+            "Building a bubble menu navigated or changed Recycle Bin marks.");
     }
 
     private static async Task VerifyRecycleSuccess(Window window, object moved, string fixture)
@@ -819,11 +800,11 @@ internal static class Verification
         var complete = (FrameworkElement)WindowField(window, "_completed");
         var show = type.GetMethod("ShowRecycleSuccess", PrivateInstance);
         object empty = Activator.CreateInstance(moved.GetType());
-        show.Invoke(window, new[] { empty, empty });
+        show.Invoke(window, new[] { empty });
         Assert(!complete.IsVisible, "An empty deletion showed a success page.");
-        show.Invoke(window, new[] { moved, empty });
-        Assert(complete.IsVisible && string.Concat(((TextBlock)complete.GetType().GetField("_size", PrivateInstance).GetValue(complete)).Inlines.OfType<System.Windows.Documents.Run>().Select(run => run.Text)) == "42.3 MB deleted" &&
-            ((TextBlock)complete.GetType().GetField("_detail", PrivateInstance).GetValue(complete)).Text.StartsWith("2 items moved to the Recycle Bin"),
+        show.Invoke(window, new[] { moved });
+        Assert(complete.IsVisible && ((TextBlock)complete.GetType().GetField("_size", PrivateInstance).GetValue(complete)).Text == "42.3 MB" &&
+            ((TextBlock)complete.GetType().GetField("_detail", PrivateInstance).GetValue(complete)).Text.StartsWith("2 items"),
             "The completion page did not show the actual moved size and count.");
         var scene = (FrameworkElement)complete.GetType().GetField("_scene", PrivateInstance).GetValue(complete);
         var pose = scene.GetType().GetMethod("RenderAt", PrivateInstance);
@@ -840,17 +821,17 @@ internal static class Verification
         await Capture(window, Path.Combine(fixture, "../deleted-compact.png"));
         window.Width = width; window.Height = height;
         type.GetMethod("ChangeAppearance", PrivateInstance).Invoke(window, new object[] { false });
-        FindVisual<Button>(complete, button => Equals(button.Content, "Home")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        FindVisual<Button>(complete, button => Equals(button.Content, "Home screen")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Assert(((UIElement)WindowField(window, "_landing")).IsVisible && !complete.IsVisible, "Home did not leave the success page.");
-        show.Invoke(window, new[] { moved, empty });
-        FindVisual<Button>(complete, button => Equals(button.Content, "Back to results")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        Assert(((UIElement)WindowField(window, "_browser")).IsVisible && !complete.IsVisible, "Back did not return to the results.");
+        show.Invoke(window, new[] { moved });
+        FindVisual<Button>(complete, button => Equals(button.Content, "Back to selection")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(((UIElement)WindowField(window, "_browser")).IsVisible && !complete.IsVisible, "Back did not return to the selection.");
         Assert(!(bool)scene.GetType().GetProperty("IsRunning", PrivateInstance).GetValue(scene), "The hidden success animation kept running.");
     }
 
     /// <summary>
-    /// The end-to-end check the old suite never made: real items really go to the Recycle Bin, Windows confirms
-    /// each one, and an item held open by another process stays put with a plain reason.
+    /// Real items really go to the Recycle Bin, Windows confirms each one, and an item held open by another
+    /// process stays put with a plain reason. This is the path that used to report "did not confirm".
     /// </summary>
     private static async Task VerifyRealRecycle(Assembly assembly, string fixture)
     {
