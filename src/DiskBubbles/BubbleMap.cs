@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -17,10 +18,15 @@ namespace DiskBubbles
         public double Radius;
     }
 
-    internal sealed class BubbleMap : FrameworkElement
+    internal sealed class BubbleMap : Grid
     {
-        private const int MaxBubbles = 11;
-        private const double Gap = 13;
+        public const int PageSize = 12;
+        private const double Gap = 8;
+        private static readonly Vector[] Directions = Enumerable.Range(0, 24).Select(step =>
+        {
+            double angle = step * Math.PI / 12;
+            return new Vector(Math.Cos(angle), Math.Sin(angle));
+        }).ToArray();
         private sealed class Layout
         {
             public Size Viewport;
@@ -28,75 +34,125 @@ namespace DiskBubbles
             public List<Bubble> Bubbles;
             public DrawingGroup Artwork;
             public bool Light;
-            public DiskEntry Other;
-            public int ListedCount;
+            public int Page;
         }
+
+        private sealed class MapLayer : FrameworkElement
+        {
+            public DrawingGroup Artwork { get; private set; }
+
+            public void Show(DrawingGroup artwork)
+            {
+                if (Artwork == artwork)
+                    return;
+                Artwork = artwork;
+                InvalidateVisual();
+            }
+
+            public void Place(Matrix pose, double opacity)
+            {
+                BeginAnimation(OpacityProperty, null);
+                Opacity = opacity;
+                RenderTransform = new MatrixTransform(pose);
+            }
+
+            public void MoveTo(Matrix target, double opacity, int duration, EventHandler finished = null)
+            {
+                Matrix start = RenderTransform.Value;
+                var scale = new ScaleTransform(start.M11, start.M22);
+                var translation = new TranslateTransform(start.OffsetX, start.OffsetY);
+                var transform = new TransformGroup();
+                transform.Children.Add(scale);
+                transform.Children.Add(translation);
+                RenderTransform = transform;
+                scale.BeginAnimation(ScaleTransform.ScaleXProperty, UiMotion.MapTween(start.M11, target.M11, duration));
+                scale.BeginAnimation(ScaleTransform.ScaleYProperty, UiMotion.MapTween(start.M22, target.M22, duration));
+                translation.BeginAnimation(TranslateTransform.XProperty, UiMotion.MapTween(start.OffsetX, target.OffsetX, duration));
+                translation.BeginAnimation(TranslateTransform.YProperty, UiMotion.MapTween(start.OffsetY, target.OffsetY, duration));
+                var fade = UiMotion.MapTween(Opacity, opacity, duration);
+                if (finished != null)
+                    fade.Completed += finished;
+                BeginAnimation(OpacityProperty, fade);
+            }
+
+            protected override void OnRender(DrawingContext drawing)
+            {
+                if (Artwork != null)
+                    drawing.DrawDrawing(Artwork);
+            }
+        }
+
         private readonly Typeface _nameFont = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal,
             FontWeights.SemiBold, FontStretches.Normal);
         private readonly Typeface _sizeFont = new Typeface("Segoe UI");
-        private readonly Brush _dot = new SolidColorBrush(Color.FromArgb(23, 179, 185, 198));
-        private readonly Brush _nameInk = new SolidColorBrush(Color.FromRgb(240, 246, 255));
-        private readonly Brush _sizeInk = new SolidColorBrush(Color.FromRgb(210, 212, 223));
-        private readonly Brush _lightDot = new SolidColorBrush(Color.FromArgb(37, 90, 87, 77));
-        private static readonly Brush LightNameInk = new SolidColorBrush(Color.FromRgb(35, 44, 42));
-        private static readonly Brush LightSizeInk = new SolidColorBrush(Color.FromRgb(56, 68, 61));
-        private Brush NameInk => Appearance.IsLight ? LightNameInk : _nameInk;
-        private Brush SizeInk => Appearance.IsLight ? LightSizeInk : _sizeInk;
+        private Brush NameInk => (Brush)FindResource("Ink");
+        private Brush SizeInk => (Brush)FindResource("Muted");
         private static readonly Geometry FolderBack = Geometry.Parse("M 1,11 Q 1,8 4,8 L 12,8 16,12 29,12 Q 31,12 31,15 L 31,25 Q 31,28 28,28 L 4,28 Q 1,28 1,25 Z");
         private static readonly Geometry FolderFront = Geometry.Parse("M 1,16 Q 1,13 4,13 L 28,13 Q 31,13 31,16 L 31,25 Q 31,28 28,28 L 4,28 Q 1,28 1,25 Z");
         private static readonly Geometry FileShape = Geometry.Parse("M 7,4 L 19,4 25,10 25,26 Q 25,28 23,28 L 9,28 Q 7,28 7,26 Z");
         private static readonly Geometry FileFold = Geometry.Parse("M 19,4 L 19,10 25,10 Z");
-        private static readonly Brush FolderFill = new LinearGradientBrush(Color.FromRgb(225, 228, 237), Color.FromRgb(155, 163, 184), 90);
-        private static readonly Brush FolderTab = new SolidColorBrush(Color.FromRgb(147, 151, 170));
-        private static readonly Brush FileFill = new LinearGradientBrush(Color.FromRgb(237, 239, 246), Color.FromRgb(160, 169, 189), 90);
-        private static readonly Brush FoldFill = new SolidColorBrush(Color.FromRgb(129, 138, 159));
-        private static readonly Brush LightFolderFill = new LinearGradientBrush(Color.FromRgb(119, 154, 149), Color.FromRgb(45, 85, 87), 90);
-        private static readonly Brush LightFileFill = new LinearGradientBrush(Color.FromRgb(120, 149, 147), Color.FromRgb(50, 82, 84), 90);
-        private static readonly Brush LightIconTab = new SolidColorBrush(Color.FromRgb(82, 118, 112));
-        private static readonly Color FolderGlass = Color.FromRgb(177, 182, 198);
-        private static readonly Color FileGlass = Color.FromRgb(170, 173, 186);
-        private static readonly Color OtherGlass = Color.FromRgb(139, 141, 154);
-        private static readonly Color LightFolderGlass = Color.FromRgb(165, 181, 184);
-        private static readonly Color LightFileGlass = Color.FromRgb(191, 184, 171);
-        private static readonly Brush PressShade = new SolidColorBrush(Color.FromArgb(58, 9, 10, 13));
+        private static readonly Brush FolderFill = new LinearGradientBrush(Color.FromRgb(236, 236, 236), Color.FromRgb(174, 177, 177), 90);
+        private static readonly Brush FolderTab = new SolidColorBrush(Color.FromRgb(148, 150, 150));
+        private static readonly Brush FileFill = new LinearGradientBrush(Color.FromRgb(236, 236, 236), Color.FromRgb(183, 185, 185), 90);
+        private static readonly Brush FoldFill = new SolidColorBrush(Color.FromRgb(151, 153, 153));
+        private static readonly Brush LightFolderFill = new LinearGradientBrush(Color.FromRgb(49, 47, 46), Color.FromRgb(5, 5, 5), 90);
+        private static readonly Brush LightFileFill = new LinearGradientBrush(Color.FromRgb(65, 62, 59), Color.FromRgb(22, 21, 20), 90);
+        private static readonly Brush LightIconTab = new SolidColorBrush(Color.FromRgb(76, 72, 69));
+        private static readonly Brush PressShade = new SolidColorBrush(Color.FromArgb(58, 10, 10, 10));
+        private static readonly Brush DarkReflection = Glow(Color.FromArgb(38, 238, 238, 238), 0.5, 0.5);
+        private static readonly Brush LightReflection = Glow(Color.FromArgb(74, 255, 255, 255), 0.5, 0.5);
 
         private readonly ConditionalWeakTable<DiskEntry, Layout> _cache = new ConditionalWeakTable<DiskEntry, Layout>();
         private DiskEntry _folder;
         private List<Bubble> _bubbles = new List<Bubble>();
         private DiskEntry _selected;
-        private HashSet<DiskEntry> _marked;
+        private ICollection<DiskEntry> _marked;
         private DiskEntry _hovered;
         private Point _hoverPoint;
         private DiskEntry _rowHovered;
         private DiskEntry _pressed;
         private Point _pressedAt;
         private bool _backgroundDown;
-        private DrawingGroup _drawing = new DrawingGroup();
-        private DrawingGroup _outgoing;
+        private MapLayer _front = new MapLayer { IsHitTestVisible = false };
+        private MapLayer _rear = new MapLayer { IsHitTestVisible = false, Opacity = 0 };
         private readonly DrawingGroup _pointerLight = new DrawingGroup();
         private readonly DrawingGroup _highlight = new DrawingGroup();
+        private readonly TranslateTransform _reflectionPosition = new TranslateTransform();
+        private EventHandler _startOnFrame;
+        private int _transitionId;
         private bool _transitioning;
 
         public BubbleMap()
         {
             ClipToBounds = true;
-            SizeChanged += (sender, args) => Reflow(null, false);
+            if ((RenderCapability.Tier >> 16) > 0)
+                _front.CacheMode = _rear.CacheMode = new BitmapCache(1.18);
+            Children.Add(_rear);
+            Children.Add(_front);
+            var effects = new MapLayer { IsHitTestVisible = false };
+            SetZIndex(effects, 2);
+            var artwork = new DrawingGroup();
+            artwork.Children.Add(_pointerLight);
+            artwork.Children.Add(_highlight);
+            effects.Show(artwork);
+            Children.Add(effects);
+            SizeChanged += (sender, args) => ResizeArtwork();
+            Unloaded += (sender, args) => Settle();
         }
 
         public event Action<DiskEntry> Activated;
+        public event Action<DiskEntry> ContextRequested;
         public event Action<DiskEntry> HoverChanged;
         public event Action BackgroundActivated;
-        public int VisibleCount => ListedCount + (Other == null ? 0 : 1);
-        public DiskEntry Other { get; private set; }
-        public int ListedCount { get; private set; }
+        public int VisibleCount => _bubbles.Count;
+        public int Page { get; private set; }
+        public int PageCount => _folder == null ? 0 : (_folder.Children.Count + PageSize - 1) / PageSize;
         public DiskEntry Inspected => _hovered ?? _rowHovered;
 
-        public void SetSelection(DiskEntry selected, IEnumerable<DiskEntry> additional)
+        public void SetSelection(DiskEntry selected, ICollection<DiskEntry> marked)
         {
-            if (_selected == selected && _marked == null && additional == null)
-                return;
             _selected = selected;
-            _marked = additional == null ? null : new HashSet<DiskEntry>(additional.Intersect(_bubbles.Select(bubble => bubble.Entry)));
+            _marked = marked;
             UpdateHighlight();
         }
 
@@ -114,7 +170,7 @@ namespace DiskBubbles
                 return;
             var reveal = UiMotion.Ease(0.32, 1, UiMotion.RevealMs);
             reveal.FillBehavior = FillBehavior.Stop;
-            _drawing.BeginAnimation(DrawingGroup.OpacityProperty, reveal);
+            _front.BeginAnimation(OpacityProperty, reveal);
         }
 
         public DiskEntry RowHover
@@ -129,9 +185,26 @@ namespace DiskBubbles
             }
         }
 
-        public void ShowEntries(DiskEntry folder, DiskEntry origin, bool returning)
+        public void ShowEntries(DiskEntry folder, int page, DiskEntry origin, bool returning, bool animate)
         {
             _folder = folder;
+            Page = Math.Max(0, Math.Min(page, PageCount - 1));
+            ResetPointer();
+            Reflow(origin, returning, animate: animate);
+        }
+
+        public void ChangePage(int page)
+        {
+            if (page < 0 || page >= PageCount || page == Page)
+                return;
+            int direction = Math.Sign(page - Page);
+            Page = page;
+            ResetPointer();
+            Reflow(null, false, animate: true, pageDirection: direction);
+        }
+
+        private void ResetPointer()
+        {
             _hovered = null;
             _rowHovered = null;
             _pressed = null;
@@ -139,44 +212,28 @@ namespace DiskBubbles
             HoverChanged?.Invoke(null);
             ToolTip = null;
             Cursor = Cursors.Arrow;
-            Reflow(origin, returning);
         }
 
-        private void Reflow(DiskEntry origin, bool returning)
+        private void ResizeArtwork()
         {
             if (_folder == null)
                 return;
 
-            List<Bubble> previous = _bubbles;
-            DrawingGroup previousDrawing = _drawing;
+            _front.Show(PrepareArtwork());
+            UpdateHighlight();
+            InvalidateVisual();
+        }
+
+        private DrawingGroup PrepareArtwork()
+        {
             double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
-            if (!_cache.TryGetValue(_folder, out Layout layout) || layout.Viewport != RenderSize || layout.PixelsPerDip != pixelsPerDip)
+            if (!_cache.TryGetValue(_folder, out Layout layout) || layout.Viewport != RenderSize ||
+                layout.PixelsPerDip != pixelsPerDip || layout.Page != Page)
             {
                 var items = _folder.Children;
-                long largest = items.Count == 0 ? 0 : items[0].Bytes;
-                var shown = items.Take(MaxBubbles)
-                    .TakeWhile(item => item.Bytes > 0 && item.Bytes >= largest * 0.012)
-                    .ToList();
-                long remaining = _folder.Bytes;
-                foreach (DiskEntry item in shown)
-                    remaining = Math.Max(0, remaining - item.Bytes);
-
-                if (remaining > 0 && shown.Count == MaxBubbles)
-                {
-                    remaining += shown[MaxBubbles - 1].Bytes;
-                    shown.RemoveAt(MaxBubbles - 1);
-                }
-
-                DiskEntry other = layout?.Other;
-                layout = new Layout { Viewport = RenderSize, PixelsPerDip = pixelsPerDip, ListedCount = shown.Count };
-                if (remaining > 0)
-                {
-                    layout.Other = other ?? new DiskEntry("Other items", null, remaining);
-                    shown.Add(layout.Other);
-                    shown.Sort((first, second) => second.Bytes.CompareTo(first.Bytes));
-                }
-
-                layout.Bubbles = Pack(shown, ActualWidth, ActualHeight);
+                int start = Page * PageSize;
+                layout = new Layout { Viewport = RenderSize, PixelsPerDip = pixelsPerDip, Page = Page,
+                    Bubbles = Pack(items.GetRange(start, Math.Min(PageSize, items.Count - start)), ActualWidth, ActualHeight) };
                 _cache.Remove(_folder);
                 _cache.Add(_folder, layout);
             }
@@ -187,103 +244,164 @@ namespace DiskBubbles
                 layout.Artwork = new DrawingGroup();
                 using (DrawingContext drawing = layout.Artwork.Open())
                     foreach (Bubble bubble in layout.Bubbles)
-                        DrawBubble(drawing, bubble, bubble.Entry == layout.Other);
+                        DrawBubble(drawing, bubble);
                 layout.Artwork.Freeze();
             }
 
-            Other = layout.Other;
-            ListedCount = layout.ListedCount;
             _bubbles = layout.Bubbles;
-            _outgoing = null;
-            _transitioning = false;
-            _drawing = new DrawingGroup();
-            _drawing.Children.Add(layout.Artwork);
+            return layout.Artwork;
+        }
 
+        private void Reflow(DiskEntry origin, bool returning, bool animate = false, int pageDirection = 0)
+        {
+            if (_folder == null)
+                return;
+
+            List<Bubble> previous = _bubbles;
+            DrawingGroup artwork = PrepareArtwork();
             Bubble anchor = (returning ? _bubbles : previous).Find(bubble => bubble.Entry == origin);
-            if (origin != null && anchor != null && SystemParameters.ClientAreaAnimation && _bubbles.Count > 0)
-                Animate(previousDrawing, anchor, returning);
+            if (animate && SystemParameters.ClientAreaAnimation && IsVisible && _front.Artwork != null)
+                Animate(artwork, anchor, returning, pageDirection);
+            else
+            {
+                _front.Show(artwork);
+                Settle();
+            }
 
             UpdateHighlight();
             InvalidateVisual();
         }
 
-        private void Animate(DrawingGroup previous, Bubble anchor, bool returning)
+        private void Animate(DrawingGroup artwork, Bubble anchor, bool returning, int pageDirection)
         {
-            _outgoing = previous;
-            DrawingGroup incoming = _drawing;
+            CancelFrameStart();
+            int transitionId = ++_transitionId;
+            if (_rear.Opacity > _front.Opacity)
+                anchor = null;
+            else
+                (_front, _rear) = (_rear, _front);
+
+            MapLayer incoming = _front;
+            MapLayer outgoing = _rear;
+            SetZIndex(outgoing, 0);
+            SetZIndex(incoming, 1);
+            outgoing.Place(outgoing.RenderTransform.Value, outgoing.Opacity);
+            incoming.Show(artwork);
             _transitioning = true;
             var center = new Point(ActualWidth / 2, ActualHeight / 2);
-            Vector delta = anchor.Center - center;
-            double scale = Math.Max(0.22, Math.Min(0.75, anchor.Radius / (Math.Min(ActualWidth, ActualHeight) / 2)));
-            var zoom = new ScaleTransform(1, 1, center.X, center.Y);
-            var position = new TranslateTransform();
-            var transform = new TransformGroup();
-            transform.Children.Add(zoom);
-            transform.Children.Add(position);
-            incoming.Transform = transform;
-            previous.Transform = previous.Transform?.CloneCurrentValue();
-
-            double from = returning ? Math.Min(1.65, 1 / scale) : scale;
-            double direction = returning ? -0.6 : 1;
-            zoom.BeginAnimation(ScaleTransform.ScaleXProperty, UiMotion.Ease(from, 1, UiMotion.ZoomMs));
-            zoom.BeginAnimation(ScaleTransform.ScaleYProperty, UiMotion.Ease(from, 1, UiMotion.ZoomMs));
-            position.BeginAnimation(TranslateTransform.XProperty, UiMotion.Ease(delta.X * direction, 0, UiMotion.ZoomMs));
-            position.BeginAnimation(TranslateTransform.YProperty, UiMotion.Ease(delta.Y * direction, 0, UiMotion.ZoomMs));
-            previous.BeginAnimation(DrawingGroup.OpacityProperty, UiMotion.Ease(previous.Opacity, 0, UiMotion.ZoomFadeMs));
-            var fade = UiMotion.Ease(0.24, 1, UiMotion.ZoomMs);
-            fade.Completed += (sender, args) =>
+            Point pivot = anchor == null ? center : returning ? anchor.Center : outgoing.RenderTransform.Value.Transform(anchor.Center);
+            Vector offset = pivot - center;
+            Matrix incomingStart;
+            Matrix outgoingEnd;
+            if (pageDirection != 0)
             {
-                if (_drawing != incoming)
-                    return;
+                var slide = new Vector(30 * pageDirection, 0);
+                incomingStart = Pose(center, 1, slide);
+                outgoingEnd = Pose(center, 1, -slide);
+            }
+            else
+            {
+                double entryScale = anchor == null ? 0.91 : Math.Max(0.60, Math.Min(0.83, anchor.Radius / center.Y + 0.31));
+                incomingStart = Pose(center, returning ? 1.14 : entryScale, offset * (returning ? -0.20 : 1));
+                outgoingEnd = Pose(returning ? center : pivot, returning ? 0.73 : 1.35,
+                    offset * (returning ? 0.86 : -0.64));
+            }
 
-                _outgoing = null;
-                _transitioning = false;
-                incoming.BeginAnimation(DrawingGroup.OpacityProperty, null);
-                incoming.Transform = Transform.Identity;
-                UpdateHighlight();
-                InvalidateVisual();
+            incoming.Place(incomingStart, 0);
+            _startOnFrame = (sender, args) =>
+            {
+                CancelFrameStart();
+                int duration = pageDirection != 0 ? UiMotion.PageSlideMs : returning ? UiMotion.ZoomBackMs : UiMotion.ZoomMs;
+                outgoing.MoveTo(outgoingEnd, 0, duration);
+                incoming.MoveTo(Matrix.Identity, 1, duration, (clock, completed) =>
+                {
+                    if (_transitionId != transitionId)
+                        return;
+                    Settle();
+                    if (IsMouseOver)
+                        TrackPointer(Mouse.GetPosition(this));
+                    UpdateHighlight();
+                });
             };
-            incoming.BeginAnimation(DrawingGroup.OpacityProperty, fade);
+            CompositionTarget.Rendering += _startOnFrame;
         }
+
+        private void CancelFrameStart()
+        {
+            if (_startOnFrame == null)
+                return;
+            CompositionTarget.Rendering -= _startOnFrame;
+            _startOnFrame = null;
+        }
+
+        private void Settle()
+        {
+            CancelFrameStart();
+            _transitionId++;
+            _transitioning = false;
+            _front.Place(Matrix.Identity, 1);
+            _rear.Place(Matrix.Identity, 0);
+            _rear.Show(null);
+        }
+
+        private static Matrix Pose(Point pivot, double scale, Vector shift) =>
+            new Matrix(scale, 0, 0, scale, pivot.X * (1 - scale) + shift.X, pivot.Y * (1 - scale) + shift.Y);
 
         internal static List<Bubble> Pack(IReadOnlyList<DiskEntry> entries, double width, double height)
         {
             var bubbles = new List<Bubble>();
-            double margin = Math.Max(15, Math.Min(38, Math.Min(width, height) * 0.08));
-            if (entries.Count == 0 || entries[0].Bytes <= 0 || width <= margin * 2 || height <= margin * 2)
+            double margin = Math.Max(14, Math.Min(32, Math.Min(width, height) * 0.06));
+            if (entries.Count == 0 || width <= margin * 2 || height <= margin * 2)
                 return bubbles;
 
-            double aspect = Math.Max(0.58, Math.Min(1.95, (width - 2 * margin) / (height - 2 * margin)));
-            double largest = entries[0].Bytes;
+            double aspect = Math.Max(0.68, Math.Min(1.45, (width - 2 * margin) / (height - 2 * margin)));
+            double largest = Math.Max(1, entries[0].Bytes);
             Rect bounds = Rect.Empty;
 
             foreach (DiskEntry entry in entries)
             {
-                double radius = 100 * Math.Sqrt(entry.Bytes / largest);
+                double radius = entries[0].Bytes == 0 ? 40 : Math.Max(19, 100 * Math.Sqrt(entry.Bytes / largest));
                 Point position = bounds.IsEmpty ? new Point() : new Point(bounds.Right + Gap + radius, 0);
                 Rect bestBounds = Include(bounds, position, radius);
                 if (bubbles.Count > 0)
                 {
                     double bestScore = PlacementScore(bestBounds, position, aspect);
-                    foreach (Bubble anchor in bubbles)
+                    void Consider(Point point)
                     {
-                        double distance = anchor.Radius + radius + Gap;
-                        for (int step = 0; step < 48; step++)
+                        if (Overlaps(bubbles, point, radius))
+                            return;
+                        Rect candidate = Include(bounds, point, radius);
+                        double score = PlacementScore(candidate, point, aspect);
+                        if (score < bestScore)
                         {
-                            double angle = (step + 0.5) * Math.PI / 24;
-                            var point = new Point(anchor.Center.X + Math.Cos(angle) * distance,
-                                anchor.Center.Y + Math.Sin(angle) * distance);
-                            if (Overlaps(bubbles, point, radius))
-                                continue;
+                            bestScore = score;
+                            position = point;
+                            bestBounds = candidate;
+                        }
+                    }
 
-                            Rect candidate = Include(bounds, point, radius);
-                            double score = PlacementScore(candidate, point, aspect);
-                            if (score < bestScore)
-                            {
-                                bestScore = score;
-                                position = point;
-                                bestBounds = candidate;
-                            }
+                    for (int i = 0; i < bubbles.Count; i++)
+                    {
+                        Bubble anchor = bubbles[i];
+                        double reach = anchor.Radius + radius + Gap;
+                        foreach (Vector direction in Directions)
+                            Consider(anchor.Center + direction * reach);
+
+                        for (int j = 0; j < i; j++)
+                        {
+                            Bubble neighbor = bubbles[j];
+                            Vector between = neighbor.Center - anchor.Center;
+                            double distance = between.Length;
+                            double neighborReach = neighbor.Radius + radius + Gap;
+                            double along = (reach * reach - neighborReach * neighborReach + distance * distance) / (2 * distance);
+                            double heightSquared = reach * reach - along * along;
+                            if (heightSquared <= 0)
+                                continue;
+                            Vector axis = between / distance;
+                            Point middle = anchor.Center + axis * along;
+                            Vector offset = new Vector(-axis.Y, axis.X) * Math.Sqrt(heightSquared);
+                            Consider(middle + offset);
+                            Consider(middle - offset);
                         }
                     }
                 }
@@ -311,7 +429,7 @@ namespace DiskBubbles
             double width = bounds.Width / aspect;
             double height = bounds.Height;
             var center = new Vector((bounds.Left + bounds.Right) / (2 * aspect), (bounds.Top + bounds.Bottom) / 2);
-            return Math.Max(width, height) + 0.12 * (width + height) + 0.38 * center.Length + 0.06 * ((Vector)added).Length;
+            return Math.Max(width, height) + 0.16 * (width + height) + 0.30 * center.Length + 0.24 * ((Vector)added).Length;
         }
 
         private static Rect Include(Rect bounds, Point point, double radius)
@@ -334,15 +452,14 @@ namespace DiskBubbles
         protected override void OnRender(DrawingContext drawing)
         {
             drawing.DrawRectangle(Brushes.Transparent, null, new Rect(RenderSize));
-            for (double y = GlassOrb.GridInset; y < ActualHeight; y += GlassOrb.GridStep)
-                for (double x = GlassOrb.GridInset; x < ActualWidth; x += GlassOrb.GridStep)
-                    drawing.DrawEllipse(Appearance.IsLight ? _lightDot : _dot, null, new Point(x, y), 0.65, 0.65);
+        }
 
-            if (_outgoing != null)
-                drawing.DrawDrawing(_outgoing);
-            drawing.DrawDrawing(_drawing);
-            drawing.DrawDrawing(_pointerLight);
-            drawing.DrawDrawing(_highlight);
+        private static Brush Glow(Color color, double radiusX, double radiusY)
+        {
+            var brush = new RadialGradientBrush(color, Color.FromArgb(0, color.R, color.G, color.B))
+                { RadiusX = radiusX, RadiusY = radiusY };
+            brush.Freeze();
+            return brush;
         }
 
         private void UpdateHighlight()
@@ -364,46 +481,42 @@ namespace DiskBubbles
                     bool pressed = bubble.Entry == _pressed;
                     bool pointer = bubble.Entry == _hovered;
                     if (pointer && !pressed && bubble.Radius >= 17 && SystemParameters.ClientAreaAnimation)
-                        GlassOrb.ReflectPointer(light, bubble.Center, bubble.Radius, _hoverPoint);
-                    Color outline = Appearance.IsLight
-                        ? (selected ? Color.FromRgb(43, 99, 107) : Color.FromRgb(111, 132, 122))
-                        : (selected ? Color.FromRgb(135, 183, 255) : Color.FromArgb(195, 233, 235, 242));
-                    var pen = new Pen(new SolidColorBrush(outline), selected ? 2.1 : 1.35);
+                    {
+                        light.PushClip(new EllipseGeometry(bubble.Center, bubble.Radius - 1, bubble.Radius - 1));
+                        light.PushTransform(_reflectionPosition);
+                        light.DrawEllipse(Appearance.IsLight ? LightReflection : DarkReflection, null, new Point(),
+                            bubble.Radius * 0.78, bubble.Radius * 0.58);
+                        light.Pop();
+                        light.Pop();
+                    }
+                    Brush outline = selected ? (Brush)FindResource("Accent") : (Brush)FindResource("Subtle");
+                    var pen = new Pen(outline, selected ? 2.1 : 1.35);
                     double rim = bubble.Radius + 0.5;
                     drawing.DrawEllipse(pressed ? PressShade : null, pen, bubble.Center, rim, rim);
                 }
             }
         }
 
-        private void DrawBubble(DrawingContext drawing, Bubble bubble, bool grouped)
+        private void DrawBubble(DrawingContext drawing, Bubble bubble)
         {
-            Color tone = Appearance.IsLight ? (bubble.Entry.IsFolder ? LightFolderGlass : LightFileGlass)
-                : grouped ? OtherGlass : bubble.Entry.IsFolder ? FolderGlass : FileGlass;
-            GlassOrb.Draw(drawing, bubble.Center, bubble.Radius, tone, grouped);
-
-            if (grouped && bubble.Radius < 39)
-            {
-                if (bubble.Radius >= 9)
-                    DrawGroupDots(drawing, bubble.Center, Math.Min(3.4, bubble.Radius * 0.12));
-                return;
-            }
+            GlassOrb.Draw(drawing, bubble.Center, bubble.Radius);
 
             if (bubble.Radius < 28)
             {
-                if (bubble.Radius >= 12)
-                    DrawGlyph(drawing, bubble, grouped, centered: true);
+                if (bubble.Radius >= 9)
+                    DrawGlyph(drawing, bubble, centered: true);
                 return;
             }
 
-            double nameSize = Math.Min(24, Math.Max(11, bubble.Radius * 0.157));
+            double nameSize = Math.Min(26, Math.Max(12, bubble.Radius * 0.171));
             bool showGlyph = bubble.Radius >= 39;
             bool system = bubble.Entry.IsSystem && bubble.Radius >= 49;
             double lift = system ? 7 : 0;
             double baseline = (showGlyph ? Math.Min(24, bubble.Radius * 0.13) : -nameSize * 0.54) - lift;
             if (showGlyph)
-                DrawGlyph(drawing, bubble, grouped, lift: lift);
+                DrawGlyph(drawing, bubble, lift: lift);
             DrawLabel(drawing, bubble, bubble.Entry.Name, _nameFont, nameSize, NameInk, baseline);
-            double size = Math.Min(16, Math.Max(10, nameSize * 0.77));
+            double size = Math.Min(18, Math.Max(11, nameSize * 0.77));
             double sizeOffset = baseline + nameSize * 1.19;
             DrawLabel(drawing, bubble, bubble.Entry.SizeLabel, _sizeFont, size, SizeInk, sizeOffset);
             if (system)
@@ -419,7 +532,7 @@ namespace DiskBubbles
             DrawLabel(drawing, bubble, "System", _nameFont, 10, (Brush)FindResource("BadgeInk"), offset);
         }
 
-        private void DrawGlyph(DrawingContext drawing, Bubble bubble, bool grouped, bool centered = false, double lift = 0)
+        private void DrawGlyph(DrawingContext drawing, Bubble bubble, bool centered = false, double lift = 0)
         {
             double width = centered ? bubble.Radius * 0.97 : Math.Min(57, bubble.Radius * 0.49);
             double anchor = centered ? (bubble.Entry.IsFolder ? 0.56 : 0.5) : 0.93;
@@ -427,9 +540,7 @@ namespace DiskBubbles
             transform.Children.Add(new ScaleTransform(width / 32, width / 32));
             transform.Children.Add(new TranslateTransform(bubble.Center.X - width / 2, bubble.Center.Y - width * anchor - lift));
             drawing.PushTransform(transform);
-            if (grouped)
-                DrawGroupDots(drawing, new Point(16, 17), 2.8);
-            else if (bubble.Entry.IsFolder)
+            if (bubble.Entry.IsFolder)
             {
                 drawing.DrawGeometry(Appearance.IsLight ? LightIconTab : FolderTab, null, FolderBack);
                 drawing.DrawGeometry(Appearance.IsLight ? LightFolderFill : FolderFill, null, FolderFront);
@@ -440,12 +551,6 @@ namespace DiskBubbles
                 drawing.DrawGeometry(Appearance.IsLight ? LightIconTab : FoldFill, null, FileFold);
             }
             drawing.Pop();
-        }
-
-        private void DrawGroupDots(DrawingContext drawing, Point center, double size)
-        {
-            for (int i = -1; i <= 1; i++)
-                drawing.DrawEllipse(SizeInk, null, new Point(center.X + i * size * 3.2, center.Y), size, size);
         }
 
         private void DrawLabel(DrawingContext drawing, Bubble bubble, string value, Typeface font,
@@ -478,15 +583,12 @@ namespace DiskBubbles
             if (entry == _hovered)
             {
                 if (entry != null && SystemParameters.ClientAreaAnimation && (pointer - _hoverPoint).LengthSquared >= 9)
-                {
-                    _hoverPoint = pointer;
-                    UpdateHighlight();
-                }
+                    MoveReflection(pointer);
                 return;
             }
 
             _hovered = entry;
-            _hoverPoint = pointer;
+            MoveReflection(pointer);
             _pointerLight.BeginAnimation(DrawingGroup.OpacityProperty, null);
             if (entry != null && SystemParameters.ClientAreaAnimation)
             {
@@ -495,10 +597,17 @@ namespace DiskBubbles
                 _pointerLight.BeginAnimation(DrawingGroup.OpacityProperty, light);
             }
             Cursor = entry == null ? Cursors.Arrow : Cursors.Hand;
-            ToolTip = entry == null ? null : entry.Name + (entry.IsSystem ? "  ·  System" : "") + "\n" + entry.SizeLabel + "  ·  " +
-                ((double)entry.Bytes / _folder.Bytes).ToString("P1") + " of this view";
+            ToolTip = entry == null ? null : entry.Name + (entry.IsSystem ? "  ·  System" : "") + "\n" + entry.SizeLabel +
+                (_folder.Bytes == 0 ? "" : "  ·  " + ((double)entry.Bytes / _folder.Bytes).ToString("P1") + " of this folder");
             HoverChanged?.Invoke(entry);
             UpdateHighlight();
+        }
+
+        private void MoveReflection(Point pointer)
+        {
+            _hoverPoint = pointer;
+            _reflectionPosition.X = pointer.X;
+            _reflectionPosition.Y = pointer.Y;
         }
 
         protected override void OnMouseLeave(MouseEventArgs args)
@@ -556,10 +665,30 @@ namespace DiskBubbles
             return true;
         }
 
+        protected override void OnMouseRightButtonUp(MouseButtonEventArgs args)
+        {
+            base.OnMouseRightButtonUp(args);
+            DiskEntry entry = Hit(args.GetPosition(this));
+            if (entry == null)
+                return;
+            _pressed = null;
+            _backgroundDown = false;
+            ToolTip = null;
+            UpdateHighlight();
+            ContextRequested?.Invoke(entry);
+            args.Handled = true;
+        }
+
         private DiskEntry Hit(Point position)
         {
-            if (_transitioning && _drawing.Transform.Inverse is GeneralTransform inverse)
+            if (_transitioning)
+            {
+                if (_front.Opacity < 0.12)
+                    return null;
+                Matrix inverse = _front.RenderTransform.Value;
+                inverse.Invert();
                 position = inverse.Transform(position);
+            }
             foreach (Bubble bubble in _bubbles)
                 if ((position - bubble.Center).LengthSquared <= bubble.Radius * bubble.Radius)
                     return bubble.Entry;

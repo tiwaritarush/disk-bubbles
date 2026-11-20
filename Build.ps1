@@ -13,9 +13,9 @@ $references = @(
     'mscorlib.dll', 'System.dll', 'System.Core.dll', 'System.Xml.dll', 'System.Xaml.dll', 'System.Windows.Forms.dll',
     'WPF/WindowsBase.dll', 'WPF/PresentationCore.dll', 'WPF/PresentationFramework.dll'
 ) | ForEach-Object { '/reference:' + (Join-Path $framework $_) }
-$sources = @('App.cs', 'Appearance.cs', 'UiMotion.cs', 'MainWindow.cs', 'MainWindow.Layout.cs', 'DiskScanner.cs',
+$sources = @('App.cs', 'Appearance.cs', 'AppInventory.cs', 'AppIcons.cs', 'AppRemoval.cs', 'AppCleanup.cs', 'AppCleanerPage.cs', 'UiMotion.cs', 'MainWindow.cs', 'MainWindow.Layout.cs', 'MainWindow.Recycle.cs', 'DiskScanner.cs',
     'NativeDirectoryReader.cs', 'BubbleMap.cs', 'SystemProtection.cs', 'ShellRecycle.cs', 'RecycleItem.cs',
-    'RecycleReview.cs', 'UiVisuals.cs') |
+    'RecycleReview.cs', 'RecycleCompletePage.cs', 'RecycleCelebration.cs', 'ExplorerShell.cs', 'UiVisuals.cs') |
     ForEach-Object { Join-Path $sourceRoot $_ }
 $resources = @('Theme.xaml', 'Dark.xaml', 'Light.xaml') | ForEach-Object {
     "/resource:$(Join-Path $sourceRoot $_),DiskBubbles.$_"

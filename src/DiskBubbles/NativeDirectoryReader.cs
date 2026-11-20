@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using Microsoft.Win32.SafeHandles;
 
@@ -19,8 +20,45 @@ namespace DiskBubbles
         private const int NoMoreFiles = 18;
         private const int InvalidDirectory = 267;
         private const int NameOffset = 68;
+        private const int StorageDeviceSeekPenaltyProperty = 7;
+        private const int IoctlStorageQueryProperty = 0x002D1400;
         private static readonly char[] InvalidName = Path.GetInvalidFileNameChars();
         private readonly IntPtr _buffer = Marshal.AllocHGlobal(BufferSize);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct StoragePropertyQuery
+        {
+            public int PropertyId;
+            public int QueryType;
+            public byte AdditionalParameters;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct SeekPenaltyDescriptor
+        {
+            public int Version;
+            public int Size;
+            public byte IncursSeekPenalty;
+        }
+
+        internal static bool HasNoSeekPenalty(string directory)
+        {
+            var mount = new StringBuilder(260);
+            var volume = new StringBuilder(64);
+            if (!GetVolumePathName(directory, mount, mount.Capacity) ||
+                !GetVolumeNameForVolumeMountPoint(mount.ToString(), volume, volume.Capacity))
+                return false;
+
+            using var handle = CreateFile(volume.ToString().TrimEnd('\\'), 0, ShareReadWriteDelete,
+                IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+            if (handle.IsInvalid)
+                return false;
+            var query = new StoragePropertyQuery { PropertyId = StorageDeviceSeekPenaltyProperty };
+            int size = Marshal.SizeOf<SeekPenaltyDescriptor>();
+            return DeviceIoControl(handle, IoctlStorageQueryProperty, ref query, Marshal.SizeOf<StoragePropertyQuery>(),
+                out SeekPenaltyDescriptor descriptor, size, out int returned, IntPtr.Zero) &&
+                returned >= size && descriptor.Version >= size && descriptor.Size >= size && descriptor.IncursSeekPenalty == 0;
+        }
 
         [StructLayout(LayoutKind.Explicit)]
         private struct DirectoryRecord
@@ -123,6 +161,20 @@ namespace DiskBubbles
         [DllImport("kernel32.dll", SetLastError = true, ExactSpelling = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetFileInformationByHandleEx(SafeFileHandle file, int informationClass, IntPtr buffer, int size);
+
+        [DllImport("kernel32.dll", EntryPoint = "GetVolumePathNameW", CharSet = CharSet.Unicode, ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetVolumePathName(string path, StringBuilder volumePath, int size);
+
+        [DllImport("kernel32.dll", EntryPoint = "GetVolumeNameForVolumeMountPointW", CharSet = CharSet.Unicode, ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetVolumeNameForVolumeMountPoint(string mountPoint, StringBuilder volumeName, int size);
+
+        [DllImport("kernel32.dll", ExactSpelling = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DeviceIoControl(SafeFileHandle device, int controlCode,
+            ref StoragePropertyQuery query, int querySize, out SeekPenaltyDescriptor descriptor, int descriptorSize,
+            out int returned, IntPtr overlapped);
 
         [DllImport("kernel32.dll", EntryPoint = "GetDiskFreeSpaceExW", CharSet = CharSet.Unicode, ExactSpelling = true)]
         [return: MarshalAs(UnmanagedType.Bool)]

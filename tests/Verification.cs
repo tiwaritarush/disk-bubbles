@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -26,6 +27,8 @@ internal static class Verification
             { "Projects/Design Sources/scene.bin", 42000000 }, { "Projects/Archive/sprint.zip", 11400000 },
             { "Projects/Build Assets/installer.msi", 5000000 }, { "Videos/raw-footage.mp4", 36000000 },
             { "Downloads/offline-installer.msi", 18600000 }, { "Backups/backup.zip", 10100000 },
+            { "Downloads/desktop.ini", 32 },
+            { "Downloads/Drafts, 2026 Ω/report & budget.txt", 7 },
             { "Libraries/reference.db", 5200000 }, { "Exports/concept.png", 4900000 },
             { "Photos/poster.psd", 4500000 }, { "Cache/texture.cache", 2500000 },
             { "Desktop/demo.mp4", 2000000 }, { "Firmware/device.img", 1300000 },
@@ -44,6 +47,8 @@ internal static class Verification
                 file.SetLength(item.Value);
         }
         File.SetAttributes(Path.Combine(fixture, "System data.bin"), FileAttributes.System);
+        File.SetAttributes(Path.Combine(fixture, "Downloads", "desktop.ini"), FileAttributes.System | FileAttributes.Hidden);
+        File.SetAttributes(Path.Combine(fixture, "Downloads"), File.GetAttributes(Path.Combine(fixture, "Downloads")) | FileAttributes.System);
 
         var assembly = Assembly.LoadFrom(Path.GetFullPath(args[0]));
         var application = (Application)assembly.GetType("DiskBubbles.App")
@@ -97,16 +102,18 @@ internal static class Verification
                 var actualProtection = forPath.Invoke(null, new object[] { realWindows, File.GetAttributes(realWindows) });
                 var innerProtection = forPath.Invoke(null, new object[] { Environment.SystemDirectory, FileAttributes.Directory });
                 var inherited = assembly.GetType("DiskBubbles.SystemProtection").GetMethod("ForEntry")
-                    .Invoke(null, new object[] { actualProtection, FileAttributes.Directory });
+                    .Invoke(null, new object[] { actualProtection, FileAttributes.Directory, "System32" });
                 Assert(actualProtection.ToString().Contains("CriticalFolder") && !innerProtection.ToString().Contains("CriticalFolder") &&
                     innerProtection.ToString().Contains("System") && inherited.ToString() == "System",
                     "The Windows root or its descendant was mislabeled.");
+                var markedRoot = forPath.Invoke(null, new object[] { Path.Combine(Path.GetPathRoot(realWindows), "System-marked root"), FileAttributes.System | FileAttributes.Directory });
+                Assert(markedRoot.ToString().Contains("System"), "An unfamiliar system-managed root folder lost protection.");
                 protection.SetValue(windows, actualProtection);
                 var map = (FrameworkElement)WindowField(window, "_map");
                 var changed = Array.CreateInstance(entryType, 1);
                 changed.SetValue(root, 0);
                 map.GetType().GetMethod("InvalidateLayout").Invoke(map, new object[] { changed });
-                windowType.GetMethod("RefreshBrowser", PrivateInstance).Invoke(window, new object[] { null, false, false });
+                windowType.GetMethod("RefreshBrowser", PrivateInstance).Invoke(window, new object[] { null, false, false, false });
                 entries.Items.Refresh();
                 var displayPath = (TextBlock)WindowField(window, "_path");
                 var capacityLabel = (TextBlock)WindowField(window, "_capacity");
@@ -117,10 +124,17 @@ internal static class Verification
                 displayPath.Text = @"D:\Storage sample";
                 capacityLabel.Text = "320 GB used   ·   192 GB free";
                 capacityMeter.Value = 0.625;
+                Assert(((SolidColorBrush)window.Background).Color == Color.FromRgb(17, 17, 18) &&
+                    ((SolidColorBrush)window.Foreground).Color == Color.FromRgb(240, 240, 240) &&
+                    ((SolidColorBrush)window.FindResource("BubbleTint")).Color == Color.FromRgb(43, 240, 138),
+                    "The dark appearance did not use charcoal, neutral text and green glass.");
                 await Capture(window, Path.Combine(fixture, "../preview.png"));
                 await Capture(window, Path.Combine(fixture, "../preview-2x.png"), 192);
                 setAppearance.Invoke(window, new object[] { true });
-                Assert(((SolidColorBrush)window.Background).Color == Color.FromRgb(239, 231, 217) && displayPath.Text == @"D:\Storage sample",
+                Assert(((SolidColorBrush)window.Background).Color == Color.FromRgb(236, 230, 220) &&
+                    ((SolidColorBrush)window.Foreground).Color == Color.FromRgb(5, 5, 5) &&
+                    ((SolidColorBrush)window.FindResource("BubbleTint")).Color == Color.FromRgb(230, 91, 196) &&
+                    displayPath.Text == @"D:\Storage sample",
                     "The light appearance failed to update in place.");
                 await Capture(window, Path.Combine(fixture, "../preview-light.png"));
                 setAppearance.Invoke(window, new object[] { false });
@@ -128,6 +142,9 @@ internal static class Verification
                 capacityLabel.Text = previousCapacity;
                 capacityMeter.Value = previousMeter;
                 long expected = files.Values.Sum();
+                var downloads = entries.Items.Cast<object>().Single(item => EntryName(item) == "Downloads");
+                Assert((bool)entryType.GetProperty("CanRecycle").GetValue(downloads), "Downloads was blocked by folder-customization metadata.");
+                VerifyScanWorkers(assembly, fixture);
                 Assert((long)root.GetType().GetProperty("Bytes").GetValue(root) == expected, "File sizes did not match the fixture.");
                 Assert((long)result.GetType().GetField("Files").GetValue(result) == files.Count, "File count differed.");
                 if (Directory.Exists(Path.Combine(fixture, "Junction")))
@@ -162,6 +179,11 @@ internal static class Verification
                 Assert((bool)recycleItem.GetProperty("Ready").GetValue(prepared[0]), "Normal file could not be reviewed.");
                 Assert(!(bool)recycleItem.GetProperty("Ready").GetValue(prepared[1]), "System file was eligible to recycle.");
                 Assert(!(bool)recycleItem.GetProperty("Ready").GetValue(prepared[2]), "The critical folder was eligible to recycle.");
+                var downloadSelection = Array.CreateInstance(entryType, 1);
+                downloadSelection.SetValue(downloads, 0);
+                var downloadReview = (IList)prepare.Invoke(null, new object[] { fixture, downloadSelection, CancellationToken.None });
+                Assert((bool)recycleItem.GetProperty("Ready").GetValue(downloadReview[0]), "Downloads customization metadata failed the final deletion check.");
+                VerifyExplorerTargets(assembly, fixture);
                 var reviewType = assembly.GetType("DiskBubbles.RecycleReview");
                 var review = (Window)Activator.CreateInstance(reviewType, window, prepared, root, root, false);
                 review.WindowStartupLocation = WindowStartupLocation.Manual;
@@ -191,13 +213,15 @@ internal static class Verification
                 entries.SelectedItem = report;
                 entries.ScrollIntoView(report);
                 var reviewButton = (Button)WindowField(window, "_reviewRecycle");
-                Assert(reviewButton.IsVisible, "Selecting a file did not expose the review action.");
+                Assert(reviewButton.IsVisible && !reviewButton.IsEnabled, "Browsing armed the Recycle Bin action.");
+                await Mark(entries, report);
+                Assert(reviewButton.IsEnabled, "Checking a file did not enable the review action.");
                 setAppearance.Invoke(window, new object[] { true });
                 Assert(ReferenceEquals(entries.SelectedItem, report), "Appearance changed the current selection.");
                 await Capture(window, Path.Combine(fixture, "../selection-light.png"));
                 setAppearance.Invoke(window, new object[] { false });
                 await Capture(window, Path.Combine(fixture, "../selection.png"));
-                await CancelReview(window, reviewButton);
+                await CancelReview(window, reviewButton, Path.Combine(fixture, "Report.pdf"));
                 Assert(!(bool)WindowField(window, "_recycleBusy") && File.Exists(Path.Combine(fixture, "Report.pdf")),
                     "Cancel did not release the browser or preserve the selected file.");
                 var confirmation = (Window)Activator.CreateInstance(reviewType, window, prepared, root, root, false);
@@ -221,9 +245,11 @@ internal static class Verification
                 Assert(left.X + entries.ActualWidth <= right.X, "The file list should sit left of the map.");
                 Assert((long)result.GetType().GetField("VolumeBytes").GetValue(result) > 0, "Volume capacity was unavailable.");
                 var packed = (IList)map.GetType().GetField("_bubbles", PrivateInstance).GetValue(map);
-                Assert(packed.Count > 5 && packed.Count <= 11, "Map uses the wrong number of bubbles.");
-                var drawingField = map.GetType().GetField("_drawing", PrivateInstance);
-                var originalArtwork = ((DrawingGroup)drawingField.GetValue(map)).Children[0];
+                Assert(packed.Count == 12, "Map uses the wrong number of bubbles.");
+                await VerifyBubbleMenu(window, map, entries, fixture);
+                var frontLayer = map.GetType().GetField("_front", PrivateInstance);
+                var artwork = frontLayer.FieldType.GetProperty("Artwork");
+                var originalArtwork = artwork.GetValue(frontLayer.GetValue(map));
                 var circles = packed.Cast<object>().Select(circle => new
                 {
                     Center = (Point)circle.GetType().GetField("Center").GetValue(circle),
@@ -239,8 +265,11 @@ internal static class Verification
                 var highlighted = (DrawingGroup)map.GetType().GetField("_highlight", PrivateInstance).GetValue(map);
                 var pointerLight = (DrawingGroup)map.GetType().GetField("_pointerLight", PrivateInstance).GetValue(map);
                 Assert(highlighted.Children.Count > 0, "Bubble hover did not draw its highlight.");
-                Assert((string)((ListBoxItem)entries.ItemContainerGenerator.ContainerFromItem(firstEntry)).Tag == "Linked",
+                Assert((bool)entryType.GetProperty("IsLinked").GetValue(firstEntry),
                     "The map hover did not identify the matching row.");
+                trackPointer.Invoke(map, new object[] { new Point(-1, -1) });
+                Assert((bool)entryType.GetProperty("IsLinked").GetValue(firstEntry), "Leaving the map lost the last linked row.");
+                trackPointer.Invoke(map, new object[] { pointer });
                 var caption = (TextBlock)WindowField(window, "_mapNote");
                 Assert(caption.Text.StartsWith("Projects", StringComparison.Ordinal) && caption.Text.Contains("of this folder"),
                     "Hover did not show the item's size and share.");
@@ -264,17 +293,12 @@ internal static class Verification
                     Assert(circle.Center.X >= circle.Radius && circle.Center.X + circle.Radius <= map.ActualWidth, "Bubble exceeds map width.");
                     Assert(circle.Center.Y >= circle.Radius && circle.Center.Y + circle.Radius <= map.ActualHeight, "Bubble exceeds map height.");
                     for (int j = 0; j < i; j++)
-                        Assert((circle.Center - circles[j].Center).Length >= circle.Radius + circles[j].Radius + 8, "Bubbles have insufficient separation.");
+                        Assert((circle.Center - circles[j].Center).Length >= circle.Radius + circles[j].Radius + 5, "Bubbles have insufficient separation.");
+                    double nearestGap = circles.Where((neighbor, index) => index != i)
+                        .Min(neighbor => (neighbor.Center - circle.Center).Length - neighbor.Radius - circle.Radius);
+                    Assert(nearestGap <= 14, "A bubble was left apart from the cluster.");
                 }
 
-                var action = (Delegate)map.GetType().GetField("Activated", PrivateInstance).GetValue(map);
-                var other = map.GetType().GetProperty("Other").GetValue(map);
-                Assert(other != null, "Other items group is missing.");
-                int otherCount = entries.Items.Count - (int)map.GetType().GetProperty("ListedCount").GetValue(map);
-                action.DynamicInvoke(other);
-                Assert(entries.Items.Count == otherCount && entries.Items.Cast<object>().Contains(report), "Other items filter shows the wrong entries.");
-                action.DynamicInvoke(other);
-                Assert(EntryName(entries.Items[0]) == "Projects", "Other items toggle did not restore the list.");
                 var press = map.GetType().GetMethod("Press", PrivateInstance);
                 var release = map.GetType().GetMethod("Release", PrivateInstance);
                 var path = (TextBlock)WindowField(window, "_path");
@@ -289,7 +313,18 @@ internal static class Verification
                     Assert((bool)transitioning.GetValue(map), "Folder zoom did not start.");
                 Assert(path.Text == Path.Combine(fixture, "Projects"), "Bubble activation did not navigate.");
                 Assert(EntryName(entries.Items[0]) == "Design Sources", "Child entries did not populate.");
-                await Task.Delay(365);
+                if (SystemParameters.ClientAreaAnimation)
+                {
+                    double originalHeight = map.ActualHeight;
+                    map.Height = originalHeight - 1;
+                    window.UpdateLayout();
+                    Assert(map.ActualHeight < originalHeight, "The first folder did not trigger the test layout change.");
+                    Assert((bool)transitioning.GetValue(map), "A layout change canceled the zoom from the first map.");
+                    map.ClearValue(FrameworkElement.HeightProperty);
+                    window.UpdateLayout();
+                    Assert(((FrameworkElement)frontLayer.GetValue(map)).Opacity == 0, "The new map appeared before the zoom started.");
+                }
+                await Task.Delay(425);
                 Assert(!(bool)transitioning.GetValue(map), "Folder zoom did not settle.");
                 await Capture(window, Path.Combine(fixture, "../folder.png"));
 
@@ -301,7 +336,7 @@ internal static class Verification
                 Assert(path.Text == fixture, "Double-clicking the background did not go up one folder.");
                 Assert(EntryName(entries.Items[0]) == "Projects", "Root entries did not repopulate.");
                 Assert(ReferenceEquals(packed, map.GetType().GetField("_bubbles", PrivateInstance).GetValue(map)), "Returning did not reuse packed geometry.");
-                Assert(ReferenceEquals(originalArtwork, ((DrawingGroup)drawingField.GetValue(map)).Children[0]), "Returning rebuilt glass artwork.");
+                Assert(ReferenceEquals(originalArtwork, artwork.GetValue(frontLayer.GetValue(map))), "Returning rebuilt glass artwork.");
                 var back = (Button)WindowField(window, "_back");
                 var forward = (Button)WindowField(window, "_forward");
                 back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -317,24 +352,69 @@ internal static class Verification
                 Assert(path.Text == fixture, "Forward failed to restore the next location.");
 
                 var activate = windowType.GetMethod("Activate", PrivateInstance);
+                ((Button)WindowField(window, "_clearMarks")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 object projects = entries.Items[0];
-                action.DynamicInvoke(other);
+                var projectBox = await FindMark(entries, projects);
+                var projectRow = (ListBoxItem)entries.ItemContainerGenerator.ContainerFromItem(projects);
+                ClickAt(window, FindVisual<Grid>(projectRow, area => area.Name == "MarkArea"), new Point(1, 13));
+                Assert(path.Text == fixture && projectBox.IsChecked == true && reviewButton.IsEnabled,
+                    "Clicking the checkbox area did not mark its folder in place.");
+                ClickAt(window, projectBox, new Point(projectBox.ActualWidth / 2, projectBox.ActualHeight / 2));
+                Assert(path.Text == fixture && projectBox.IsChecked == false && !reviewButton.IsEnabled,
+                    "Clicking the checkbox again did not unmark it in place.");
+                ToggleMark(projectBox);
+                Click(FindVisual<TextBlock>(projectRow, label => label.Text == "Projects"));
+                Assert(path.Text == Path.Combine(fixture, "Projects"), "One click did not open a folder row.");
+                back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert((await FindMark(entries, projects)).IsChecked == true, "Opening a marked folder lost its mark.");
+                await FindMark(entries, windows);
+                var criticalRow = (ListBoxItem)entries.ItemContainerGenerator.ContainerFromItem(windows);
+                Click(FindVisual<Grid>(criticalRow, area => area.Name == "MarkArea"));
+                Assert(path.Text == fixture && (bool)entryType.GetProperty("IsMarked").GetValue(windows),
+                    "A protected folder could not be selected for review.");
+                ((Button)WindowField(window, "_clearMarks")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                await Mark(entries, report);
+                var nextPage = (Button)WindowField(window, "_mapNext");
+                var previousPage = (Button)WindowField(window, "_mapPrevious");
+                var mapped = new List<object>();
+                do
+                {
+                    var page = (IList)map.GetType().GetField("_bubbles", PrivateInstance).GetValue(map);
+                    mapped.AddRange(page.Cast<object>().Select(bubble => bubble.GetType().GetField("Entry").GetValue(bubble)));
+                    if (!nextPage.IsEnabled)
+                        break;
+                    nextPage.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                } while (true);
+                Assert(mapped.SequenceEqual(entries.Items.Cast<object>()), "The map omitted, duplicated, or reordered an entry.");
+                Assert(previousPage.IsEnabled, "The map did not offer a way back from its last page.");
+                int lastPage = (int)map.GetType().GetProperty("Page").GetValue(map);
+                await Task.Delay(250);
+                await Capture(window, Path.Combine(fixture, "../last-map-page.png"));
                 var scrollMethod = windowType.GetMethod("ListingScrollViewer", BindingFlags.Static | BindingFlags.NonPublic);
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 var listScroll = (ScrollViewer)scrollMethod.Invoke(null, new object[] { entries });
                 listScroll.ScrollToVerticalOffset(4);
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 double offset = listScroll.VerticalOffset;
-                Assert(offset > 0, "The filtered list did not scroll in the fixture.");
+                Assert(offset > 0, "The list did not scroll in the fixture.");
                 activate.Invoke(window, new[] { projects });
                 back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                Assert(entries.Items.Count == otherCount && listScroll.VerticalOffset == offset,
-                    "Back did not restore the folder's filter and scroll position.");
-                action.DynamicInvoke(other);
+                Assert((int)map.GetType().GetProperty("Page").GetValue(map) == lastPage && listScroll.VerticalOffset == offset,
+                    "Back did not restore the map page and scroll position.");
+                Assert((bool)entryType.GetProperty("IsMarked").GetValue(report), "A checked file was lost during navigation.");
+                var reportBox = await FindMark(entries, report);
+                Assert(reportBox.IsChecked == true, "A returned or recycled row did not restore its checkbox.");
+                Assert((await FindMark(entries, windows)).IsEnabled, "Critical folder cannot be selected for review.");
                 activate.Invoke(window, new[] { projects });
                 object design = entries.Items[0];
+                await Mark(entries, design);
                 activate.Invoke(window, new[] { design });
+                object sceneEntry = entries.Items[0];
+                await Mark(entries, sceneEntry);
+                string designPath = Path.Combine(fixture, "Projects", "Design Sources");
+                await CancelReview(window, reviewButton, Path.Combine(fixture, "Report.pdf"), designPath);
+                Assert(reviewButton.IsEnabled, "Cancel cleared the review marks.");
                 back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Assert(path.Text == Path.Combine(fixture, "Projects"), "Could not return to parent for recycle test.");
                 var picked = Array.CreateInstance(design.GetType(), 1);
@@ -361,12 +441,28 @@ internal static class Verification
                 var simulatedMove = (IList)prepare.Invoke(null, new object[] { path.Text, picked, CancellationToken.None });
                 recycleItem.GetField("Files", PrivateInstance).SetValue(simulatedMove[0], 1L);
                 recycleItem.GetField("Folders", PrivateInstance).SetValue(simulatedMove[0], 1L);
-                windowType.GetMethod("ApplyRecycled", PrivateInstance).Invoke(window, new object[] { simulatedMove });
+                recycleItem.GetField("Files", PrivateInstance).SetValue(prepared[0], 1L);
+                simulatedMove.Add(prepared[0]);
+                var markedRoots = (IEnumerable)windowType.GetMethod("MarkedRoots", PrivateInstance).Invoke(window, null);
+                object[] roots = markedRoots.Cast<object>().ToArray();
+                Assert(roots.Length == 2, "A folder and its child both entered the move list.");
+                var selection = Array.CreateInstance(roots[0].GetType(), roots.Length);
+                Array.Copy(roots, selection, roots.Length);
+                activate.Invoke(window, new[] { design });
+                windowType.GetMethod("ApplyRecycled", PrivateInstance).Invoke(window, new object[] { simulatedMove, selection });
+                Assert(path.Text == Path.Combine(fixture, "Projects"), "Moving the visible folder did not navigate to its parent.");
                 Assert(entries.Items.Cast<object>().All(item => EntryName(item) != "Design Sources"), "Map still contains the recycled folder.");
-                Assert((long)root.GetType().GetProperty("Bytes").GetValue(root) == expected - 42000000,
+                Assert((long)root.GetType().GetProperty("Bytes").GetValue(root) == expected - 42000000 - 260000,
                     "Affected ancestor size was not updated.");
-                Assert(!forward.IsEnabled, "Navigation history still points to the moved folder.");
+                Assert(!reviewButton.IsEnabled && !(bool)entryType.GetProperty("IsMarked").GetValue(sceneEntry),
+                    "Marks survived a confirmed move of those files or their parent.");
+                await VerifyRecycleSuccess(window, simulatedMove, fixture);
                 up.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert(entries.Items.Cast<object>().All(item => EntryName(item) != "Report.pdf"), "The move from another folder stayed in the scan.");
+                await Mark(entries, projects);
+                ((Button)WindowField(window, "_clearMarks")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert((await FindMark(entries, projects)).IsChecked == false && !reviewButton.IsEnabled,
+                    "Clear did not reset the marked row and review action.");
 
                 string emptyPath = Path.Combine(fixture, "Empty");
                 var scanMethod = windowType.GetMethod("ScanAsync", PrivateInstance);
@@ -382,8 +478,8 @@ internal static class Verification
                 await Capture(window, Path.Combine(fixture, "../compact-light.png"));
                 await (Task)scanMethod.Invoke(window, new object[] { emptyPath });
                 Assert(path.Text == emptyPath && entries.Items.Count == 1, "Zero-size folder scan was incomplete.");
-                Assert(((TextBlock)WindowField(window, "_mapEmpty")).Visibility == Visibility.Visible, "Empty map message is missing.");
-                await Capture(window, Path.Combine(fixture, "../empty.png"));
+                Assert((int)map.GetType().GetProperty("VisibleCount").GetValue(map) == 1, "Zero-byte item did not get a bubble.");
+                await Capture(window, Path.Combine(fixture, "../zero-byte.png"));
 
                 string reportPath = Path.Combine(fixture, "Report.pdf");
                 File.SetLastWriteTimeUtc(reportPath, File.GetLastWriteTimeUtc(reportPath).AddSeconds(5));
@@ -393,6 +489,7 @@ internal static class Verification
                     "An entry changed after review but was still moved.");
                 Assert(File.Exists(Path.Combine(fixture, "System data.bin")), "A system item was moved.");
                 var visuals = assembly.GetType("DiskBubbles.UiVisuals");
+                await VerifyAppCleaner(window, assembly, fixture, expected);
                 var notice = (Window)visuals.GetMethod("Notice").Invoke(null, new object[] { window, "Can’t open this location",
                     "Windows couldn’t read this location. Choose another folder or drive." });
                 notice.WindowStartupLocation = WindowStartupLocation.Manual;
@@ -403,7 +500,7 @@ internal static class Verification
                 await Task.Delay(260);
                 await Capture(notice, Path.Combine(fixture, "../notice.png"));
                 notice.Close();
-                Console.WriteLine($"Verified {files.Count} files and {expected} bytes, both themes, map interaction and navigation, cancellation, Recycle Bin review, and rejection of protected, ambiguous, remote and changed targets.");
+                Console.WriteLine($"Verified {files.Count} files and {expected} bytes, map navigation, Recycle Bin safeguards, both themes, App Cleaner progress and icons, app sizing, and uninstall review.");
                 application.Shutdown(0);
             }
             catch (Exception error)
@@ -418,6 +515,382 @@ internal static class Verification
 
     private static object WindowField(Window window, string name) =>
         window.GetType().GetField(name, PrivateInstance).GetValue(window);
+
+    private static async Task VerifyAppCleaner(Window window, Assembly assembly, string fixture, long expected)
+    {
+        var inventory = assembly.GetType("DiskBubbles.AppInventory");
+        var measurement = inventory.GetMethod("Measure", BindingFlags.Static | BindingFlags.NonPublic)
+            .Invoke(null, new object[] { fixture, CancellationToken.None });
+        Assert((long)measurement.GetType().GetField("Item1").GetValue(measurement) == expected,
+            "The app folder size did not match its files on disk.");
+        var normalize = inventory.GetMethod("Normalize", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert(normalize.Invoke(null, new object[] { Path.GetPathRoot(fixture) }) == null &&
+            normalize.Invoke(null, new object[] { Path.Combine(fixture, "..", "Other") }) == null,
+            "A drive root or traversal path passed the app path boundary.");
+
+        var page = (FrameworkElement)WindowField(window, "_appCleaner");
+        var disk = (Button)WindowField(window, "_diskMode");
+        var cleaner = (Button)WindowField(window, "_appsMode");
+        var list = (ListBox)page.GetType().GetField("_list", PrivateInstance).GetValue(page);
+        var scanAction = (Button)page.GetType().GetField("_scanAction", PrivateInstance).GetValue(page);
+        cleaner.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(!list.IsVisible && scanAction.IsVisible && (string)scanAction.Content == "Cancel scan",
+            "App Cleaner showed inactive results instead of the scan state.");
+        CaptureCurrent(window, Path.Combine(fixture, "../app-scan-light.png"));
+        if ((string)scanAction.Content == "Cancel scan")
+            scanAction.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var stop = DateTime.UtcNow.AddSeconds(5);
+        var activeScan = page.GetType().GetField("_scan", PrivateInstance);
+        while (activeScan.GetValue(page) != null && DateTime.UtcNow < stop)
+            await Task.Delay(20);
+        Assert(activeScan.GetValue(page) == null, "App Cleaner did not stop after canceling.");
+        var entryType = assembly.GetType("DiskBubbles.InstalledApp");
+        var appIconProperty = entryType.GetProperty("Icon");
+        var iconReader = assembly.GetType("DiskBubbles.AppIcons").GetMethod("Load", BindingFlags.Static | BindingFlags.NonPublic);
+        var registeredIcon = entryType.GetField("DisplayIcon", PrivateInstance);
+        var apps = (IList)page.GetType().GetField("_apps", PrivateInstance).GetValue(page);
+        apps.Clear();
+        object Add(string name, string publisher, long? bytes, string kind = null)
+        {
+            var item = Activator.CreateInstance(entryType);
+            entryType.GetProperty("Name").SetValue(item, name);
+            entryType.GetProperty("Publisher").SetValue(item, publisher);
+            entryType.GetProperty("Version").SetValue(item, "4.2.1");
+            entryType.GetProperty("Bytes").SetValue(item, bytes);
+            entryType.GetProperty("Package").SetValue(item, kind);
+            entryType.GetProperty("Location").SetValue(item, @"D:\Apps\" + name);
+            apps.Add(item);
+            return item;
+        }
+
+        var studio = Add("Frame Studio", "Northlight Labs", 4880000000L);
+        var audio = Add("Station Audio", "Station", 1670000000L);
+        var notes = Add("Canvas Notes", null, 640000000L, "Example.Notes_4.2.1.0_x64__fixture");
+        var archive = Add("Archive Tool", "Archive Labs", 152000000L);
+        var noIcon = Add("Image Utility", "Field Tools", null);
+
+        string iconFolder = Directory.CreateDirectory(Path.Combine(fixture, "../Icon sample")).FullName;
+        string iconExecutable = Path.Combine(iconFolder, "Frame, Studio.exe");
+        File.Copy(assembly.Location, iconExecutable);
+        registeredIcon.SetValue(studio, "\"" + iconExecutable + "\",0");
+        var desktopIcon = await Task.Run(() => (ImageSource)iconReader.Invoke(null, new[] { studio }));
+        Assert(desktopIcon != null && desktopIcon.IsFrozen, "A quoted Desktop icon registration could not load on a scan worker.");
+        appIconProperty.SetValue(studio, desktopIcon);
+
+        var tile = new DrawingVisual();
+        using (var paint = tile.RenderOpen())
+        {
+            paint.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(238, 189, 102)), null, new Rect(1, 1, 46, 46), 10, 10);
+            for (int y = 16; y <= 32; y += 8)
+                paint.DrawRoundedRectangle(Brushes.SaddleBrown, null, new Rect(12, y, y == 32 ? 15 : 24, 2), 1, 1);
+        }
+        var logo = new RenderTargetBitmap(48, 48, 96, 96, PixelFormats.Pbgra32);
+        logo.Render(tile);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(logo));
+        using (var file = File.Create(Path.Combine(iconFolder, "Notes.targetsize-48_altform-unplated.png"))) encoder.Save(file);
+        var location = entryType.GetProperty("Location");
+        location.SetValue(notes, iconFolder);
+        string manifest = Path.Combine(iconFolder, "AppxManifest.xml");
+        File.WriteAllText(manifest, "<Package><VisualElements Square44x44Logo=\"Notes.png\" /></Package>");
+        var packageIcon = await Task.Run(() => (ImageSource)iconReader.Invoke(null, new[] { notes }));
+        Assert(packageIcon != null && packageIcon.IsFrozen, "A Store icon could not load from a qualified package asset.");
+        appIconProperty.SetValue(notes, packageIcon);
+        location.SetValue(notes, @"D:\Apps\Canvas Notes");
+        registeredIcon.SetValue(noIcon, @"\\remote.invalid\share\App.exe,0");
+        Assert(iconReader.Invoke(null, new[] { noIcon }) == null, "A remote icon path was accepted.");
+        appIconProperty.SetValue(audio, new DrawingImage(new GeometryDrawing(Brushes.MediumSlateBlue, null,
+            Geometry.Parse("M 1,7 A 6,6 0 1 0 13,7 A 6,6 0 1 0 1,7 M 4,7 L 6,7 7,4 8,10 9,7 10,7"))));
+        appIconProperty.SetValue(archive, new DrawingImage(new GeometryDrawing(Brushes.CadetBlue, null,
+            Geometry.Parse("M 1,3 H 13 V 5 H 1 Z M 2,6 H 12 V 12 H 2 Z M 5,7 H 9 V 8 H 5 Z"))));
+        entryType.GetField("WindowsInstaller", PrivateInstance).SetValue(studio, true);
+        entryType.GetField("Key", PrivateInstance).SetValue(studio, "{40F8C74A-E077-47BD-90AC-DC90F04304CD}");
+        entryType.GetField("Command", PrivateInstance).SetValue(studio, "MsiExec.exe /I{40F8C74A-E077-47BD-90AC-DC90F04304CD}");
+        var launcher = assembly.GetType("DiskBubbles.AppRemoval").GetMethod("DesktopLauncher", BindingFlags.Static | BindingFlags.NonPublic);
+        var process = (System.Diagnostics.ProcessStartInfo)launcher.Invoke(null, new[] { studio });
+        Assert(process != null && process.FileName == Path.Combine(Environment.SystemDirectory, "msiexec.exe") &&
+            process.Arguments == "/x {40f8c74a-e077-47bd-90ac-dc90f04304cd} /norestart", "The MSI registration did not produce an explicit uninstall.");
+        entryType.GetField("Command", PrivateInstance).SetValue(studio, @"C:\Windows\System32\cmd.exe /c echo forbidden");
+        Assert(launcher.Invoke(null, new[] { studio }) == null, "A shell command passed the uninstaller boundary.");
+        entryType.GetField("Command", PrivateInstance).SetValue(studio, "MsiExec.exe /I{40F8C74A-E077-47BD-90AC-DC90F04304CD}");
+        VerifyAppCleanupPolicy(assembly, entryType, studio, notes, archive, iconFolder);
+        page.GetType().GetField("_loaded", PrivateInstance).SetValue(page, true);
+        ((TextBlock)page.GetType().GetField("_status", PrivateInstance).GetValue(page)).Text = "5 installed apps · largest measured first";
+        page.GetType().GetMethod("UpdateScanView", PrivateInstance).Invoke(page, null);
+        page.GetType().GetMethod("UpdateList", PrivateInstance).Invoke(page, null);
+        cleaner.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(page.IsVisible && !((FrameworkElement)WindowField(window, "_browser")).IsVisible, "App Cleaner did not open as a separate mode.");
+        var search = (TextBox)page.GetType().GetField("_search", PrivateInstance).GetValue(page);
+        search.Text = "Northlight";
+        Assert(list.Items.Count == 1 && ReferenceEquals(list.Items[0], studio), "The app filter missed its publisher.");
+        search.Clear();
+        list.SelectedItem = studio;
+        window.Width = Math.Max(window.MinWidth, Math.Min(1280, SystemParameters.WorkArea.Width));
+        window.Height = Math.Max(window.MinHeight, Math.Min(870, SystemParameters.WorkArea.Height));
+        var light = window.GetType().GetMethod("ChangeAppearance", PrivateInstance);
+        await Capture(window, Path.Combine(fixture, "../app-cleaner-light.png"));
+        var studioRow = (ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(studio);
+        var studioImage = FindVisual<Image>(studioRow, image => image.Name == "RegisteredAppIcon");
+        Assert(studioImage != null && studioImage.IsVisible && ReferenceEquals(studioImage.Source, desktopIcon),
+            "The installed app's registered icon did not render in its row.");
+        var missingRow = (ListBoxItem)list.ItemContainerGenerator.ContainerFromItem(noIcon);
+        Assert(FindVisual<Border>(missingRow, border => border.Name == "AppPlaceholder")?.IsVisible == true,
+            "An app without a registered icon did not show its fallback.");
+        light.Invoke(window, new object[] { false });
+        await Capture(window, Path.Combine(fixture, "../app-cleaner-dark.png"));
+
+        var uninstall = (Button)page.GetType().GetField("_uninstall", PrivateInstance).GetValue(page);
+        var deepUninstall = (Button)page.GetType().GetField("_deepUninstall", PrivateInstance).GetValue(page);
+        Assert(uninstall.IsVisible && deepUninstall.IsVisible && uninstall.IsEnabled && deepUninstall.IsEnabled,
+            "The selected app did not expose both uninstall actions.");
+        await CloseAppReview(window, uninstall, "Review uninstall", "Start uninstall");
+        await CloseAppReview(window, deepUninstall, "Review deep uninstall", "Start deep uninstall");
+        list.SelectedItem = archive;
+        bool darkWhileBusy = false;
+        await CloseAppReview(window, uninstall, "Uninstall unavailable", "Close", () =>
+        {
+            var bitmap = CaptureCurrent(window, Path.Combine(fixture, "../app-cleaner-uninstall-busy.png"));
+            var sample = list.TranslatePoint(new Point(list.ActualWidth / 2, list.ActualHeight - 12), (UIElement)window.Content);
+            var pixel = new byte[4];
+            bitmap.CopyPixels(new Int32Rect((int)sample.X, (int)sample.Y, 1, 1), pixel, 4, 0);
+            darkWhileBusy = !list.IsEnabled && Math.Max(pixel[0], Math.Max(pixel[1], pixel[2])) < 100;
+        });
+        Assert(darkWhileBusy, "The disabled app list switched away from its dark theme during uninstall.");
+
+        search.Text = "a";
+        list.SelectedItem = archive;
+        var visibleApps = list.ItemsSource;
+        page.GetType().GetMethod("RemoveInstalledApp", PrivateInstance).Invoke(page, new[] { studio });
+        Assert(!apps.Contains(studio) && !list.Items.Contains(studio) && list.Items.Contains(archive) &&
+            ReferenceEquals(list.SelectedItem, archive) && ReferenceEquals(list.ItemsSource, visibleApps) &&
+            search.Text == "a" && activeScan.GetValue(page) == null,
+            "A confirmed uninstall failed to update the current app list in place.");
+        disk.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(!page.IsVisible && ((FrameworkElement)WindowField(window, "_browser")).IsVisible &&
+            ((TextBlock)WindowField(window, "_path")).Text == Path.Combine(fixture, "Empty"), "Switching modes discarded the disk scan.");
+        light.Invoke(window, new object[] { true });
+    }
+
+    private static void VerifyAppCleanupPolicy(Assembly assembly, Type app, object desktop, object store, object other, string fixture)
+    {
+        var cleanup = assembly.GetType("DiskBubbles.AppCleanup");
+        var paths = cleanup.GetMethod("Candidates", BindingFlags.Static | BindingFlags.NonPublic);
+        string[] Candidates(object entry, bool deep) => ((IEnumerable)paths.Invoke(null, new[] { entry, deep })).Cast<object>()
+            .Select(item => (string)item.GetType().GetField("Item1").GetValue(item)).ToArray();
+        Assert(Candidates(desktop, false).Length == 0 && Candidates(desktop, true).Length > 0,
+            "The basic uninstall included unregistered folders or the deep scan missed the app data locations.");
+        var family = app.GetField("PackageFamily", PrivateInstance);
+        family.SetValue(store, @"..\Windows");
+        Assert(Candidates(store, true).Length == 0, "A traversal path passed Store app cleanup.");
+        family.SetValue(store, "Example.Notes_0123456789abc");
+        Assert(Candidates(store, false).Length == 0 && Candidates(store, true).Length == 5,
+            "Store cleanup didn't limit its candidates to the named per-user folders.");
+        var command = app.GetField("Command", PrivateInstance);
+        var location = app.GetProperty("Location");
+        var registered = app.GetField("RegisteredLocation", PrivateInstance);
+        var roots = (string[])assembly.GetType("DiskBubbles.AppInventory").GetField("ProgramRoots", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+        string originalRoot = roots[0];
+        string originalLocation = (string)location.GetValue(other);
+        try
+        {
+            string appDirectory = Directory.CreateDirectory(Path.Combine(fixture, "Vendor app")).FullName;
+            string setup = Path.Combine(appDirectory, "setup.exe");
+            File.Copy(assembly.Location, setup);
+            roots[0] = fixture;
+            location.SetValue(other, appDirectory);
+            registered.SetValue(other, true);
+            var launcher = assembly.GetType("DiskBubbles.AppRemoval").GetMethod("DesktopLauncher", BindingFlags.Static | BindingFlags.NonPublic);
+            command.SetValue(other, "\"" + setup + "\" /install");
+            Assert(launcher.Invoke(null, new[] { other }) == null, "Setup was allowed to run without an uninstall action.");
+            command.SetValue(other, "\"" + setup + "\" --uninstall");
+            Assert(launcher.Invoke(null, new[] { other }) != null && Candidates(other, false).SequenceEqual(new[] { appDirectory }),
+                "The registered desktop uninstaller or its dedicated folder wasn't recognized.");
+            var service = cleanup.GetMethod("PointsInside", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert((bool)service.Invoke(null, new object[] { "\"" + setup + "\" --service", appDirectory }),
+                "A service pointing inside the app folder didn't block cleanup.");
+            var scan = assembly.GetType("DiskBubbles.DiskScanner").GetMethods().Single(method => method.Name == "Scan");
+            var treeCheck = cleanup.GetMethod("CanRecycleTree", BindingFlags.Static | BindingFlags.NonPublic);
+            bool SafeTree()
+            {
+                var result = scan.Invoke(null, new object[] { appDirectory, CancellationToken.None, null, 1 });
+                return (bool)treeCheck.Invoke(null, new[] { result.GetType().GetField("Root").GetValue(result) });
+            }
+            Assert(SafeTree(), "A clean disposable folder did not pass the app cleanup policy.");
+            File.WriteAllText(Path.Combine(appDirectory, "test-audio.sys"), "disposable driver-name fixture");
+            Assert(!SafeTree(), "A folder containing driver files passed the app cleanup policy.");
+        }
+        finally
+        {
+            roots[0] = originalRoot;
+            location.SetValue(other, originalLocation);
+            registered.SetValue(other, false);
+            command.SetValue(other, null);
+        }
+    }
+
+    private static void VerifyExplorerTargets(Assembly assembly, string fixture)
+    {
+        var shell = assembly.GetType("DiskBubbles.ExplorerShell");
+        Assert(shell != null, "Explorer still depends on command-line path parsing.");
+        var resolve = shell.GetMethod("Resolve", BindingFlags.Static | BindingFlags.NonPublic);
+        string directory = Path.Combine(fixture, "Downloads", "Drafts, 2026 Ω");
+        string file = Path.Combine(directory, "report & budget.txt");
+        foreach (var item in new[] { (Path: directory + "\\", Folder: true), (Path: file, Folder: false) })
+        {
+            using (var target = (IDisposable)resolve.Invoke(null, new object[] { item.Path, item.Folder }))
+            {
+                string nativePath = (string)target.GetType().GetProperty("Path", PrivateInstance).GetValue(target);
+                Assert(string.Equals(nativePath, item.Path.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) &&
+                    (bool)target.GetType().GetProperty("IsFolder", PrivateInstance).GetValue(target) == item.Folder,
+                    "The Windows Shell resolved another folder or filename.");
+            }
+        }
+        string downloads = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+        if (Directory.Exists(downloads))
+        {
+            using (var target = (IDisposable)resolve.Invoke(null, new object[] { downloads, true }))
+                Assert(string.Equals((string)target.GetType().GetProperty("Path", PrivateInstance).GetValue(target), downloads, StringComparison.OrdinalIgnoreCase),
+                    "The actual Downloads folder resolved to another Shell location.");
+        }
+        try
+        {
+            using (var target = (IDisposable)resolve.Invoke(null, new object[] { Path.Combine(directory, "missing.txt"), false })) { }
+            Assert(false, "A missing Explorer target silently fell back to Home.");
+        }
+        catch (TargetInvocationException error) { Assert(error.InnerException is IOException, "A missing target reported an unexpected error."); }
+    }
+
+    private static async Task VerifyBubbleMenu(Window window, FrameworkElement map, ListBox entries, string folder)
+    {
+        var build = window.GetType().GetMethod("BuildBubbleMenu", PrivateInstance);
+        Assert(build != null, "Bubbles do not offer an Explorer context menu.");
+        string pathBefore = ((TextBlock)WindowField(window, "_path")).Text;
+        string marksBefore = ((TextBlock)WindowField(window, "_selectionSummary")).Text;
+        foreach (string name in new[] { "Projects", "Report.pdf", "Windows" })
+        {
+            object entry = entries.Items.Cast<object>().Single(item => EntryName(item) == name);
+            var menu = (ContextMenu)build.Invoke(window, new[] { entry });
+            Assert(menu != null && menu.Items.Count == 3 && menu.PlacementTarget == map, "Bubble menu is missing or targets another control.");
+            Assert(Equals(((MenuItem)menu.Items[0]).Header, "Select") && Equals(((MenuItem)menu.Items[1]).Header, "Delete"), "Bubble actions are out of order.");
+            Assert(((MenuItem)menu.Items[1]).IsEnabled == (name != "Windows"), "Protected folder deletion was not blocked.");
+            var open = menu.Items[2] as MenuItem;
+            Assert(open != null && Equals(open.Header, "Open in Explorer") && open.IsEnabled &&
+                Equals(open.ToolTip, Path.Combine(folder, name)), "Explorer menu points to the wrong item or blocks browsing a protected folder.");
+        }
+        object invalid = Activator.CreateInstance(entries.Items[0].GetType(), new object[] { "../outside.txt", null, 0L });
+        Assert(build.Invoke(window, new[] { invalid }) == null, "Bubble menu accepted a path outside the scanned folder.");
+        object project = entries.Items.Cast<object>().Single(item => EntryName(item) == "Projects");
+        object previous = entries.SelectedItem;
+        var projectMenu = (ContextMenu)build.Invoke(window, new[] { project });
+        ((MenuItem)projectMenu.Items[0]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        var check = await FindMark(entries, project);
+        Assert(check.IsChecked == true && ReferenceEquals(entries.SelectedItem, project), "Select did not check and reveal the bubble's row.");
+        window.GetType().GetMethod("SetMarked", PrivateInstance).Invoke(window, new[] { project, (object)false });
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        Assert(check.IsChecked == false, "The checkbox did not follow a programmatic deselection.");
+        entries.SelectedItem = previous;
+        window.GetType().GetMethod("LinkEntry", PrivateInstance).Invoke(window, new object[] { null });
+        Assert(((TextBlock)WindowField(window, "_path")).Text == pathBefore &&
+            ((TextBlock)WindowField(window, "_selectionSummary")).Text == marksBefore,
+            "Building a bubble menu navigated or changed Recycle Bin marks.");
+    }
+
+    private static async Task VerifyRecycleSuccess(Window window, object moved, string fixture)
+    {
+        var type = window.GetType();
+        var complete = (FrameworkElement)WindowField(window, "_completed");
+        var show = type.GetMethod("ShowRecycleSuccess", PrivateInstance);
+        object empty = Activator.CreateInstance(moved.GetType());
+        show.Invoke(window, new[] { empty });
+        Assert(!complete.IsVisible, "An empty deletion showed a success page.");
+        show.Invoke(window, new[] { moved });
+        Assert(complete.IsVisible && ((TextBlock)complete.GetType().GetField("_size", PrivateInstance).GetValue(complete)).Text == "42.3 MB" &&
+            ((TextBlock)complete.GetType().GetField("_detail", PrivateInstance).GetValue(complete)).Text.StartsWith("2 items"),
+            "The completion page did not show the actual moved size and count.");
+        var scene = (FrameworkElement)complete.GetType().GetField("_scene", PrivateInstance).GetValue(complete);
+        var pose = scene.GetType().GetMethod("RenderAt", PrivateInstance);
+        foreach (double time in new[] { 0.42, 1.15, 2.4, 3.15, 3.52, 4.5 })
+        {
+            pose.Invoke(scene, new object[] { time });
+            await Capture(window, Path.Combine(fixture, "../deleted-" + time.ToString("F2", System.Globalization.CultureInfo.InvariantCulture) + ".png"));
+        }
+        type.GetMethod("ChangeAppearance", PrivateInstance).Invoke(window, new object[] { true });
+        pose.Invoke(scene, new object[] { 2.4 });
+        await Capture(window, Path.Combine(fixture, "../deleted-light.png"));
+        double width = window.Width, height = window.Height;
+        window.Width = window.MinWidth; window.Height = window.MinHeight;
+        await Capture(window, Path.Combine(fixture, "../deleted-compact.png"));
+        window.Width = width; window.Height = height;
+        type.GetMethod("ChangeAppearance", PrivateInstance).Invoke(window, new object[] { false });
+        FindVisual<Button>(complete, button => Equals(button.Content, "Home screen")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(((UIElement)WindowField(window, "_landing")).IsVisible && !complete.IsVisible, "Home did not leave the success page.");
+        show.Invoke(window, new[] { moved });
+        FindVisual<Button>(complete, button => Equals(button.Content, "Back to selection")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(((UIElement)WindowField(window, "_browser")).IsVisible && !complete.IsVisible, "Back did not return to the selection.");
+        Assert(!(bool)scene.GetType().GetProperty("IsRunning", PrivateInstance).GetValue(scene), "The hidden success animation kept running.");
+    }
+
+    private static void VerifyScanWorkers(Assembly assembly, string fixture)
+    {
+        var scan = assembly.GetType("DiskBubbles.DiskScanner").GetMethod("Scan");
+        var serial = scan.Invoke(null, new object[] { fixture, CancellationToken.None, null, 1 });
+        var parallel = scan.Invoke(null, new object[] { fixture, CancellationToken.None, null, 32 });
+        foreach (string field in new[] { "Files", "Folders", "Skipped", "RootPartial" })
+            Assert(Equals(serial.GetType().GetField(field).GetValue(serial), parallel.GetType().GetField(field).GetValue(parallel)),
+                "Parallel scan changed " + field + ".");
+        var root = serial.GetType().GetField("Root");
+        Assert(ScanTree(root.GetValue(serial)).SequenceEqual(ScanTree(root.GetValue(parallel))),
+            "Parallel scan changed folder sizes, contents or protection.");
+        var probe = assembly.GetType("DiskBubbles.NativeDirectoryReader").GetMethod("HasNoSeekPenalty", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert(!(bool)probe.Invoke(null, new object[] { "" }), "Unknown storage was treated as a non-seeking device.");
+    }
+
+    private static IEnumerable<string> ScanTree(object entry, string parent = "")
+    {
+        var type = entry.GetType();
+        string path = parent + "/" + type.GetProperty("Name").GetValue(entry);
+        yield return path + "|" + type.GetProperty("Bytes").GetValue(entry) + "|" + type.GetProperty("Protection", PrivateInstance).GetValue(entry);
+        var children = (IEnumerable)type.GetProperty("Children", PrivateInstance).GetValue(entry);
+        if (children != null)
+            foreach (object child in children.Cast<object>().OrderBy(EntryName, StringComparer.Ordinal))
+                foreach (string item in ScanTree(child, path))
+                    yield return item;
+    }
+
+    private static async Task CloseAppReview(Window window, Button action, string title, string expectedButton, Action inspect = null)
+    {
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(25) };
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        timer.Tick += (sender, args) =>
+        {
+            Window modal = Application.Current.Windows.Cast<Window>().FirstOrDefault(item => item.Owner == window && item.IsVisible);
+            if (modal == null && DateTime.UtcNow < deadline) return;
+            timer.Stop();
+            if (modal == null)
+            {
+                completion.SetResult(false);
+                return;
+            }
+            bool matched = modal.Title == title && FindVisual<Button>(modal, button => Equals(button.Content, expectedButton))?.IsEnabled == true;
+            if (matched && inspect != null)
+            {
+                try { inspect(); }
+                catch (Exception error)
+                {
+                    modal.Closed += (closed, args) => completion.SetException(error);
+                    modal.Close();
+                    return;
+                }
+            }
+            modal.Closed += (closed, args) => completion.SetResult(matched);
+            modal.Close();
+        };
+        timer.Start();
+        action.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert(await completion.Task, "App Cleaner did not show " + title + ".");
+        await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+    }
 
     private static string EntryName(object item) => (string)item.GetType().GetProperty("Name").GetValue(item);
 
@@ -445,7 +918,50 @@ internal static class Verification
         return null;
     }
 
-    private static async Task CancelReview(Window owner, Button reviewButton)
+    private static async Task<CheckBox> FindMark(ListBox entries, object entry)
+    {
+        await entries.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        entries.ScrollIntoView(entry);
+        await entries.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        entries.UpdateLayout();
+        var row = entries.ItemContainerGenerator.ContainerFromItem(entry) as ListBoxItem;
+        var box = FindVisual<CheckBox>(row, check => check.Name == "Mark");
+        Assert(box != null, "A file row did not render its checkbox: " + EntryName(entry));
+        return box;
+    }
+
+    private static async Task Mark(ListBox entries, object entry)
+    {
+        var box = await FindMark(entries, entry);
+        Assert(box.IsEnabled, "Expected a markable file row.");
+        if (box.IsChecked != true)
+            ToggleMark(box);
+    }
+
+    private static void ToggleMark(CheckBox box) =>
+        typeof(CheckBox).GetMethod("OnClick", PrivateInstance).Invoke(box, null);
+
+    private static void Click(UIElement target)
+    {
+        Assert(target != null, "The click target was not rendered.");
+        foreach (var routedEvent in new[] { Mouse.PreviewMouseDownEvent, Mouse.PreviewMouseUpEvent })
+        {
+            target.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+                { RoutedEvent = routedEvent, Source = target });
+        }
+    }
+
+    private static void ClickAt(Window window, FrameworkElement element, Point point)
+    {
+        Point position = element.TransformToAncestor(window).Transform(point);
+        var hit = window.InputHitTest(position) as DependencyObject;
+        while (hit != null && !(hit is UIElement))
+            hit = VisualTreeHelper.GetParent(hit);
+        Assert(hit is UIElement, "The checkbox hit target was not reachable through the visual tree.");
+        Click((UIElement)hit);
+    }
+
+    private static async Task CancelReview(Window owner, Button reviewButton, params string[] paths)
     {
         var reviewed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var deadline = DateTime.UtcNow.AddSeconds(5);
@@ -462,19 +978,27 @@ internal static class Verification
                 reviewed.SetResult(false);
             else
             {
-                dialog.Closed += (closedSender, closedArgs) => reviewed.SetResult(true);
+                var list = FindVisual<ListBox>(dialog, control => control.Items.Count > 0);
+                bool correct = list != null && list.Items.Cast<object>().Select(item =>
+                    (string)item.GetType().GetProperty("Path").GetValue(item)).OrderBy(path => path).SequenceEqual(paths.OrderBy(path => path));
+                dialog.Closed += (closedSender, closedArgs) => reviewed.SetResult(correct);
                 dialog.Close();
             }
         };
         timer.Start();
         reviewButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        Assert(await reviewed.Task, "The review action did not open its confirmation dialog.");
+        Assert(await reviewed.Task, "The review dialog did not show the expected paths.");
         await owner.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
     }
 
     private static async Task Capture(Window window, string path, double dpi = 96)
     {
         await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        CaptureCurrent(window, path, dpi);
+    }
+
+    private static RenderTargetBitmap CaptureCurrent(Window window, string path, double dpi = 96)
+    {
         var view = (FrameworkElement)window.Content;
         view.UpdateLayout();
         double scale = dpi / 96;
@@ -485,6 +1009,7 @@ internal static class Verification
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using (var file = File.Create(path))
             encoder.Save(file);
+        return bitmap;
     }
 
     private static void Assert(bool value, string message)

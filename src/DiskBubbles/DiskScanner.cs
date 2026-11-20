@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Security;
@@ -9,10 +10,12 @@ using System.Threading.Tasks;
 
 namespace DiskBubbles
 {
-    public sealed class DiskEntry
+    public sealed class DiskEntry : INotifyPropertyChanged
     {
         private static readonly string[] SizeUnits = { "B", "KB", "MB", "GB", "TB", "PB", "EB" };
         private bool _ordered;
+        private bool _marked;
+        private bool _linked;
 
         public DiskEntry(string name, List<DiskEntry> children, long bytes = 0)
         {
@@ -26,6 +29,28 @@ namespace DiskBubbles
         public bool IsFolder => Children != null;
         public string SizeLabel => FormatSize(Bytes);
         public bool IsSystem => IsFolder && (Protection & EntryProtection.CriticalFolder) != 0;
+        public bool CanRecycle => Protection == EntryProtection.None;
+        public bool IsMarked
+        {
+            get => _marked;
+            internal set
+            {
+                if (_marked == value) return;
+                _marked = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsMarked)));
+            }
+        }
+        public bool IsLinked
+        {
+            get => _linked;
+            internal set
+            {
+                if (_linked == value) return;
+                _linked = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsLinked)));
+            }
+        }
+        public event PropertyChangedEventHandler PropertyChanged;
         public string AccessibleName => Name + ", " + SizeLabel + (IsSystem ? ", critical Windows folder" : "");
         internal EntryProtection Protection { get; set; }
         internal List<DiskEntry> Children { get; }
@@ -86,12 +111,13 @@ namespace DiskBubbles
             {
                 FileAttributes attributes = root.Attributes;
                 result.Root.Protection = SystemProtection.ForPath(root.FullName, attributes) |
-                    SystemProtection.ForEntry(result.Root.Protection, attributes);
+                    SystemProtection.ForEntry(result.Root.Protection, attributes, root.Name);
             }
             catch (Exception error) when (IsFileSystemError(error))
             {
             }
-            int workers = workerCount > 0 ? workerCount : Math.Min(8, Environment.ProcessorCount);
+            int workers = workerCount > 0 ? workerCount : NativeDirectoryReader.HasNoSeekPenalty(root.FullName)
+                ? Math.Min(32, Environment.ProcessorCount * 2) : Math.Min(8, Environment.ProcessorCount);
             using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
             using var available = new SemaphoreSlim(0);
             var pending = new ConcurrentQueue<PendingFolder>();
@@ -204,7 +230,7 @@ namespace DiskBubbles
                     else
                     {
                         string path = needsPath ? Path.Combine(folder.Path, name) : null;
-                        EntryProtection protection = SystemProtection.ForEntry(folder.Entry.Protection, attributes);
+                        EntryProtection protection = SystemProtection.ForEntry(folder.Entry.Protection, attributes, name);
                         if (folder.IsVolumeRoot)
                             protection |= SystemProtection.ForPath(path, attributes);
 
