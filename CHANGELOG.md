@@ -1,5 +1,10 @@
 # Changelog
 
+## 10.4.3
+
+- Right-click a bubble to open its context menu and choose Open in Explorer. Folders open directly; files are selected in their containing folder.
+- Opening the menu preserves the current folder and Recycle Bin marks. The menu uses the item's path from when it was opened.
+
 ## 10.4.2
 
 - Center the checkbox tick inside its outline in Disk Scan and App Cleaner. The surrounding click area belongs to the checkbox.
