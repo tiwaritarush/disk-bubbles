@@ -8,6 +8,8 @@ namespace DiskBubbles
     internal sealed class RecycleCelebration : FrameworkElement
     {
         internal const double Duration = 4.6;
+        // The scene is authored over 4.6 s; playing it 1.7x faster keeps every pose and ends in about 2.7 s.
+        private const double Speed = 1.7;
         private static readonly Geometry Body = Shape("M 280,159 L 440,159 426,280 Q 424,294 409,294 L 311,294 Q 296,294 294,280 Z");
         private static readonly Geometry Smile = Shape("M -11,8 C -5,17 5,17 11,8");
         private static readonly Geometry Side = Shape("M 280,159 L 307,172 320,294 311,294 Q 296,294 294,280 Z");
@@ -48,7 +50,7 @@ namespace DiskBubbles
 
         private void Advance(object sender, EventArgs args)
         {
-            _time = Math.Min(Duration, _clock.Elapsed.TotalSeconds);
+            _time = Math.Min(Duration, _clock.Elapsed.TotalSeconds * Speed);
             InvalidateVisual();
             if (_time >= Duration || !IsVisible)
                 Stop();
