@@ -23,50 +23,57 @@ namespace DiskBubbles
     {
         private sealed class FolderView
         {
-            public int MapPage;
+            public int MapStart;
             public double Offset;
         }
 
         private readonly Grid _surface = new Grid();
         private readonly Grid _browser = new Grid();
+        private readonly AmbientField _ambient = new AmbientField();
         private readonly AppCleanerPage _appCleaner;
         private readonly Button _diskMode = new Button { Content = "Disk Scan" };
         private readonly Button _appsMode = new Button { Content = "App Cleaner" };
         private readonly ListBox _entries = new ListBox();
         private readonly BubbleMap _map = new BubbleMap();
         private readonly StackPanel _crumbs = new StackPanel { Orientation = Orientation.Horizontal };
-        private readonly Button _folder = new Button { Content = "Open folder…" };
-        private readonly Button _drive = new Button { Content = "Scan drive  ▾" };
-        private readonly Button _recycleBin = new Button { Content = "Recycle Bin" };
+        private readonly Button _folder = new Button();
+        private readonly Button _drive = new Button();
+        private readonly Button _recycleBin = new Button();
         private readonly Button _appearance = new Button();
         private readonly Button _up = new Button { ToolTip = "Up one folder (Alt+Up)" };
         private readonly Button _back = new Button { ToolTip = "Back (Alt+Left)" };
         private readonly Button _forward = new Button { ToolTip = "Forward (Alt+Right)" };
-        private readonly Button _rescan = new Button { Content = "Rescan" };
+        private readonly Button _rescan = new Button();
         private readonly Button _reviewRecycle = new Button();
         private readonly Button _clearMarks = new Button { Content = "Clear" };
-        private readonly TextBlock _selectionSummary = new TextBlock();
-        private readonly Button _mapPrevious = new Button();
-        private readonly Button _mapNext = new Button();
-        private readonly StackPanel _mapPager = new StackPanel();
-        private readonly TextBlock _mapRange = new TextBlock();
-        private readonly Button _cancel = new Button { Content = "Cancel" };
+        private readonly Border _selectionTray = new Border();
+        private readonly TextBlock _selectionCount = new TextBlock();
+        private readonly TextBlock _selectionSize = new TextBlock();
+        private readonly Border _pager = new Border();
+        private readonly Button _pagePrevious = new Button();
+        private readonly Button _pageNext = new Button();
+        private readonly TextBlock _pageRange = new TextBlock();
+        private readonly TextBlock _pageZoom = new TextBlock();
+        private readonly WorkSheet _work = new WorkSheet();
+        private readonly Button _cancel = new Button { Content = "Cancel scan" };
         private readonly TextBlock _path = new TextBlock();
         private readonly TextBlock _itemCount = new TextBlock();
         private readonly TextBlock _mapNote = new TextBlock();
         private readonly TextBlock _mapEmpty = new TextBlock();
+        private readonly StackPanel _empty = new StackPanel();
         private readonly TextBlock _total = new TextBlock();
+        private readonly TextBlock _totalNote = new TextBlock();
         private readonly TextBlock _status = new TextBlock();
         private readonly TextBlock _capacity = new TextBlock();
-        private readonly ProgressBar _capacityBar = new ProgressBar { Height = 5, Maximum = 1 };
+        private readonly ProgressBar _capacityBar = new ProgressBar { Height = 6, Maximum = 1 };
         private readonly StackPanel _capacityPanel = new StackPanel();
         private readonly TextBlock _scanCounts = new TextBlock();
         private readonly TextBlock _scanPath = new TextBlock();
-        private readonly ProgressBar _spinner = new ProgressBar { Height = 6, Width = 288 };
+        private readonly ProgressBar _spinner = new ProgressBar { Height = 6, Width = 300 };
         private readonly Grid _landing = new Grid();
         private readonly Grid _scanning = new Grid();
         private readonly RecycleCompletePage _completed = new RecycleCompletePage();
-        private readonly List<StorageIllustration> _illustrations = new List<StorageIllustration>(2);
+        private readonly List<FrameworkElement> _artwork = new List<FrameworkElement>();
         private readonly Stack<List<DiskEntry>> _backHistory = new Stack<List<DiskEntry>>();
         private readonly Stack<List<DiskEntry>> _forwardHistory = new Stack<List<DiskEntry>>();
         private readonly ConditionalWeakTable<DiskEntry, FolderView> _folderViews = new ConditionalWeakTable<DiskEntry, FolderView>();
@@ -86,13 +93,13 @@ namespace DiskBubbles
         public MainWindow()
         {
             Title = "Disk Bubbles";
-            Width = Math.Min(1280, SystemParameters.WorkArea.Width);
-            Height = Math.Min(870, SystemParameters.WorkArea.Height);
-            MinWidth = 800;
-            MinHeight = 586;
+            Width = Math.Min(1320, SystemParameters.WorkArea.Width);
+            Height = Math.Min(880, SystemParameters.WorkArea.Height);
+            MinWidth = 820;
+            MinHeight = 600;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            SetResourceReference(Control.BackgroundProperty, "Base");
-            SetResourceReference(Control.ForegroundProperty, "Ink");
+            SetResourceReference(BackgroundProperty, "Base");
+            SetResourceReference(ForegroundProperty, "Ink");
             FontFamily = new FontFamily("Segoe UI");
             Typography.SetNumeralAlignment(this, FontNumeralAlignment.Tabular);
             UseLayoutRounding = true;
@@ -105,26 +112,25 @@ namespace DiskBubbles
                 _result.NeedsRefresh = true;
                 UpdateScanStatus();
             }, busy => _diskMode.IsEnabled = !busy);
-            var shell = new DockPanel { LayoutTransform = new ScaleTransform(1.08, 1.08) };
-            shell.SetResourceReference(Panel.BackgroundProperty, "Workspace");
+
+            var shell = new DockPanel { LayoutTransform = new ScaleTransform(1.06, 1.06) };
             var header = BuildHeader();
             DockPanel.SetDock(header, Dock.Top);
             shell.Children.Add(header);
-            _surface.Margin = new Thickness(24, 14, 24, 15);
+            _surface.Margin = new Thickness(22, 14, 22, 14);
             shell.Children.Add(_surface);
             var viewport = new Grid();
+            viewport.Children.Add(_ambient);
             viewport.Children.Add(shell);
             Content = viewport;
             BuildBrowser();
             BuildLanding();
             BuildScanning();
-            _surface.Children.Add(_browser);
-            _surface.Children.Add(_landing);
-            _surface.Children.Add(_scanning);
-            _surface.Children.Add(_appCleaner);
-            _surface.Children.Add(_completed);
+            foreach (UIElement page in new UIElement[] { _browser, _landing, _scanning, _appCleaner, _completed })
+                _surface.Children.Add(page);
             _completed.BackRequested += () => ShowPage(_browser);
             _completed.HomeRequested += () => ShowPage(_landing);
+            _completed.RecycleBinRequested += () => OpenExplorer("shell:RecycleBinFolder");
             ShowPage(_landing);
 
             _folder.Click += async (sender, args) => await ChooseFolderAsync();
@@ -136,10 +142,15 @@ namespace DiskBubbles
             AutomationProperties.SetName(_back, "Back");
             AutomationProperties.SetName(_forward, "Forward");
             AutomationProperties.SetName(_up, "Up one folder");
-            _mapPrevious.Click += (sender, args) => ChangeMapPage(_map.Page - 1);
-            _mapNext.Click += (sender, args) => ChangeMapPage(_map.Page + 1);
+            _pagePrevious.Click += (sender, args) => _map.PreviousPage();
+            _pageNext.Click += (sender, args) => _map.NextPage();
             _rescan.Click += async (sender, args) => await ScanAsync(_rootPath);
             _map.Activated += Activate;
+            _map.PageChanged += () =>
+            {
+                UpdateMapPager();
+                UpdateSelection();
+            };
             _map.ContextRequested += entry =>
             {
                 ContextMenu menu = BuildBubbleMenu(entry);
@@ -151,6 +162,7 @@ namespace DiskBubbles
             {
                 if (entry != null)
                     LinkEntry(entry);
+                _ambient.Focus(entry == null ? (Color?)null : UiVisuals.KindColor(entry.Kind));
                 UpdateMapCaption();
             };
             _entries.MouseMove += (sender, args) =>
@@ -178,7 +190,12 @@ namespace DiskBubbles
                     SetMarked(entry, box.IsChecked == true);
                 }
             }));
-            _entries.SelectionChanged += (sender, args) => UpdateSelection();
+            _entries.SelectionChanged += (sender, args) =>
+            {
+                if (_entries.SelectedItem is DiskEntry entry)
+                    _map.Reveal(entry);
+                UpdateSelection();
+            };
             _entries.PreviewMouseLeftButtonDown += (sender, args) =>
             {
                 _markPressed = MarkAt(args.OriginalSource);
@@ -192,19 +209,18 @@ namespace DiskBubbles
                 DiskEntry pressed = _rowPressed;
                 _rowPressed = null;
                 Vector movement = args.GetPosition(_entries) - _rowPressPoint;
+                bool stayed = Math.Abs(movement.X) <= SystemParameters.MinimumHorizontalDragDistance &&
+                    Math.Abs(movement.Y) <= SystemParameters.MinimumVerticalDragDistance;
                 DiskEntry mark = _markPressed;
                 _markPressed = null;
                 if (mark != null)
                 {
                     args.Handled = true;
-                    if (mark == MarkAt(args.OriginalSource) && Math.Abs(movement.X) <= SystemParameters.MinimumHorizontalDragDistance &&
-                        Math.Abs(movement.Y) <= SystemParameters.MinimumVerticalDragDistance)
+                    if (mark == MarkAt(args.OriginalSource) && stayed && mark.CanRecycle)
                         SetMarked(mark, !mark.IsMarked);
                     return;
                 }
-                if (pressed == null || !pressed.IsFolder || pressed != RowAt(args.OriginalSource) ||
-                    Math.Abs(movement.X) > SystemParameters.MinimumHorizontalDragDistance ||
-                    Math.Abs(movement.Y) > SystemParameters.MinimumVerticalDragDistance)
+                if (pressed == null || !pressed.IsFolder || pressed != RowAt(args.OriginalSource) || !stayed)
                     return;
                 args.Handled = true;
                 Activate(pressed);
@@ -214,13 +230,19 @@ namespace DiskBubbles
                 if (RowAt(args.OriginalSource) is DiskEntry entry && !entry.IsFolder)
                     OpenFileInExplorer(entry);
             };
-            _entries.KeyDown += (sender, args) =>
+            _entries.KeyDown += async (sender, args) =>
             {
-                if (args.Key == Key.Enter && !(args.OriginalSource is CheckBox))
-                {
+                if (args.OriginalSource is CheckBox || !(_entries.SelectedItem is DiskEntry entry))
+                    return;
+                if (args.Key == Key.Enter)
                     OpenSelected(animate: false);
-                    args.Handled = true;
-                }
+                else if (args.Key == Key.Space && entry.CanRecycle)
+                    SetMarked(entry, !entry.IsMarked);
+                else if (args.Key == Key.Delete)
+                    await RecycleAsync(new[] { MarkFor(entry) }, review: true);
+                else
+                    return;
+                args.Handled = true;
             };
             Closed += (sender, args) =>
             {
@@ -237,19 +259,35 @@ namespace DiskBubbles
                     args.Handled = true;
                     return;
                 }
-                if (_recycleBusy || _browser.Visibility != Visibility.Visible || Keyboard.Modifiers != ModifierKeys.Alt || args.Key != Key.System)
+                if (_recycleBusy || _browser.Visibility != Visibility.Visible)
                     return;
-                if (args.SystemKey == Key.Left)
-                    MoveInHistory(_backHistory, _forwardHistory, animate: false);
-                else if (args.SystemKey == Key.Right)
-                    MoveInHistory(_forwardHistory, _backHistory, animate: false);
-                else if (args.SystemKey == Key.Up)
+                if (Keyboard.Modifiers == ModifierKeys.Alt && args.Key == Key.System)
+                {
+                    if (args.SystemKey == Key.Left)
+                        MoveInHistory(_backHistory, _forwardHistory, animate: false);
+                    else if (args.SystemKey == Key.Right)
+                        MoveInHistory(_forwardHistory, _backHistory, animate: false);
+                    else if (args.SystemKey == Key.Up)
+                        Navigate(_trail.Count - 2, animate: false);
+                    else
+                        return;
+                    args.Handled = true;
+                }
+                else if (Keyboard.Modifiers == ModifierKeys.None && args.Key == Key.Back && !(args.OriginalSource is TextBox))
+                {
                     Navigate(_trail.Count - 2, animate: false);
-                else
-                    return;
-                args.Handled = true;
+                    args.Handled = true;
+                }
+                else if (Keyboard.Modifiers == ModifierKeys.None && (args.Key == Key.PageDown || args.Key == Key.PageUp) && !_entries.IsKeyboardFocusWithin)
+                {
+                    if (args.Key == Key.PageDown) _map.NextPage(); else _map.PreviousPage();
+                    args.Handled = true;
+                }
             };
         }
+
+        private MarkedEntry MarkFor(DiskEntry entry) =>
+            new MarkedEntry { Entry = entry, Parents = _trail.ToArray(), Folder = CurrentPath() };
 
         private void ShowDriveMenu()
         {
@@ -257,11 +295,19 @@ namespace DiskBubbles
             foreach (var drive in DriveInfo.GetDrives().Where(item => item.DriveType == DriveType.Fixed || item.DriveType == DriveType.Removable))
             {
                 string path = drive.RootDirectory.FullName;
-                var item = new MenuItem { Header = path };
+                string label = path.TrimEnd('\\');
+                try
+                {
+                    if (drive.IsReady)
+                        label += $"   {DiskEntry.FormatSize(drive.TotalSize - drive.TotalFreeSpace)} of {DiskEntry.FormatSize(drive.TotalSize)} used";
+                }
+                catch (Exception error) when (DiskScanner.IsFileSystemError(error))
+                {
+                }
+                var item = new MenuItem { Header = label };
                 item.Click += async (sender, args) => await ScanAsync(path);
                 menu.Items.Add(item);
             }
-
             _drive.ContextMenu = menu;
             menu.IsOpen = true;
         }
@@ -277,7 +323,7 @@ namespace DiskBubbles
 
         internal async Task ScanAsync(string path)
         {
-            if (_scan != null || _recycleBusy)
+            if (_scan != null || _recycleBusy || string.IsNullOrEmpty(path))
                 return;
 
             var scan = new CancellationTokenSource();
@@ -318,11 +364,12 @@ namespace DiskBubbles
 
                 _rootPath = fullPath;
                 _result = result;
+                foreach (DiskEntry entry in _marked.Keys)
+                    entry.IsMarked = false;
                 _marked.Clear();
                 _backHistory.Clear();
                 _forwardHistory.Clear();
                 _trail = new List<DiskEntry> { result.Root };
-                RefreshBrowser();
                 completed = true;
             }
             catch (OperationCanceledException) when (scan.IsCancellationRequested)
@@ -342,9 +389,11 @@ namespace DiskBubbles
                     _spinner.IsIndeterminate = false;
                     _folder.IsEnabled = _drive.IsEnabled = true;
                     if (_appCleaner.Visibility != Visibility.Visible)
-                    {
                         ShowPage(_result == null ? _landing : _browser);
-                        if (completed) _map.Reveal();
+                    if (completed)
+                    {
+                        RefreshBrowser();
+                        _map.Reveal();
                     }
                 }
             }
@@ -357,7 +406,7 @@ namespace DiskBubbles
             DiskEntry current = _trail[_trail.Count - 1];
             current.OrderChildren();
             FolderView view = restoreView && _folderViews.TryGetValue(current, out FolderView remembered) ? remembered : null;
-            _map.ShowEntries(current, view?.MapPage ?? 0, origin, returning, animate);
+            _map.ShowEntries(current, view?.MapStart ?? 0, origin, returning, animate);
             UpdateMapPager();
             _rowPressed = null;
             _entries.ItemsSource = current.Children;
@@ -365,9 +414,12 @@ namespace DiskBubbles
             ListingScrollViewer(_entries)?.ScrollToVerticalOffset(view?.Offset ?? 0);
             _itemCount.Text = current.Children.Count > 1 ? $"{CountLabel(current.Children.Count, "item")} · largest first"
                 : CountLabel(current.Children.Count, "item");
-            _mapEmpty.Text = "This folder is empty";
-            _mapEmpty.Visibility = current.Children.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            _empty.Visibility = current.Children.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            _mapEmpty.Text = current.Children.Count == 0 && (current.Protection & EntryProtection.Incomplete) != 0
+                ? "Windows didn’t let Disk Bubbles read this folder" : "This folder is empty";
             _total.Text = current.SizeLabel;
+            _totalNote.Text = _trail.Count == 1 || _result.Root.Bytes == 0 ? "Scanned size"
+                : $"{(double)current.Bytes / _result.Root.Bytes:P1} of this scan";
             _path.Text = CurrentPath();
             _path.ToolTip = _path.Text;
             UpdateScanStatus();
@@ -378,7 +430,7 @@ namespace DiskBubbles
             if (_result.VolumeBytes > 0)
             {
                 long used = _result.VolumeBytes - _result.FreeBytes;
-                _capacity.Text = DiskEntry.FormatSize(used) + " used   ·   " + DiskEntry.FormatSize(_result.FreeBytes) + " free";
+                _capacity.Text = DiskEntry.FormatSize(used) + " used  ·  " + DiskEntry.FormatSize(_result.FreeBytes) + " free";
                 _capacityBar.Value = (double)used / _result.VolumeBytes;
             }
             UpdateBreadcrumbs();
@@ -387,29 +439,31 @@ namespace DiskBubbles
 
         private void UpdateScanStatus()
         {
-            _status.Text = Counts(_result.Files, _result.Folders, _result.Skipped) + $"  ·  {_result.Elapsed.TotalSeconds:0.00} s";
+            if (_result == null)
+                return;
+            _status.Text = Counts(_result.Files, _result.Folders, _result.Skipped) + $"  ·  {_result.Elapsed.TotalSeconds:0.0} s";
             if (_result.NeedsRefresh)
-                _status.Text += "  ·  Rescan to update changed items";
-            _status.ToolTip = _result.NeedsRefresh ? "A move or external change may have changed the scan totals."
+                _status.Text += "  ·  Rescan to refresh totals";
+            _status.ToolTip = _result.NeedsRefresh ? "Something changed outside this scan, or an item couldn’t be checked. Rescan for exact totals."
                 : _result.Skipped > 0 ? "Unreadable entries, unsupported names and filesystem links were skipped."
-                : "Totals are based on file sizes.";
-        }
-
-        private void ChangeMapPage(int page)
-        {
-            _map.ChangePage(page);
-            UpdateMapPager();
-            UpdateSelection();
+                : "Totals are file sizes. Space used on disk can differ slightly.";
         }
 
         private void UpdateMapPager()
         {
-            int count = _trail[_trail.Count - 1].Children.Count;
-            int start = _map.Page * BubbleMap.PageSize;
-            _mapPager.Visibility = _map.PageCount > 1 ? Visibility.Visible : Visibility.Hidden;
-            _mapPrevious.IsEnabled = _map.Page > 0;
-            _mapNext.IsEnabled = _map.Page + 1 < _map.PageCount;
-            _mapRange.Text = $"{start + 1:N0}–{Math.Min(count, start + BubbleMap.PageSize):N0} of {count:N0}";
+            bool paged = _map.HasPrevious || _map.HasNext;
+            _pager.Visibility = paged ? Visibility.Visible : Visibility.Collapsed;
+            _pagePrevious.IsEnabled = _map.HasPrevious;
+            _pageNext.Visibility = _map.HasNext ? Visibility.Visible : Visibility.Collapsed;
+            _pageRange.Text = _map.PageEnd - _map.PageStart > 1
+                ? $"{_map.PageStart + 1:N0}–{_map.PageEnd:N0} of {_map.ItemCount:N0}"
+                : $"{_map.PageEnd:N0} of {_map.ItemCount:N0}";
+            double zoom = _map.PageZoom;
+            _pageZoom.Text = zoom >= 1.5 ? $"shown {(zoom >= 100 ? zoom.ToString("N0") : zoom.ToString("0.#"))}× larger than page 1" : "";
+            _pageZoom.Visibility = _pageZoom.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            _pager.ToolTip = _map.HasNext
+                ? $"{_map.ItemCount - _map.PageEnd:N0} smaller items continue on the next page (Page Down)"
+                : "Sizes are true to scale within each page";
         }
 
         private void UpdateMapCaption()
@@ -419,20 +473,19 @@ namespace DiskBubbles
 
             DiskEntry entry = _map.Inspected ?? (_entries.SelectedItems.Count == 1 ? _entries.SelectedItem as DiskEntry : null);
             DiskEntry folder = _trail[_trail.Count - 1];
-            string caption = _trail.Count == 1 ? "Click a folder to open it" : "Double-click space to go up";
+            string caption = _trail.Count == 1 ? "Click to open · right-click for more" : "Double-click empty space to go up";
             if (entry != null)
             {
                 caption = entry.Name + "  ·  " + entry.SizeLabel;
                 if (folder.Bytes > 0)
-                    caption += $"  ·  {((double)entry.Bytes / folder.Bytes):P1} of this folder";
+                    caption += $"  ·  {(double)entry.Bytes / folder.Bytes:P1}";
                 if (entry.IsSystem)
                     caption += "  ·  System";
             }
             if (_mapNote.Text == caption)
                 return;
-
             _mapNote.Text = caption;
-            _mapNote.ToolTip = entry == null ? "Click a folder bubble to open it. Double-click an empty part of the map to go up." : caption;
+            _mapNote.SetResourceReference(TextBlock.ForegroundProperty, entry == null ? "Muted" : "Ink");
         }
 
         private void UpdateBreadcrumbs()
@@ -446,17 +499,16 @@ namespace DiskBubbles
                         AddDivider("›  …");
                     continue;
                 }
-
                 if (i > 0)
                     AddDivider("›");
 
                 int level = i;
-                string name = _trail[i].Name;
+                string name = _trail[i].Name.TrimEnd('\\');
                 bool current = i == _trail.Count - 1;
-                string text = name.Length > 24 ? name.Substring(0, 23) + "…" : name;
+                string text = name.Length > 26 ? name.Substring(0, 25) + "…" : name;
                 if (current)
                 {
-                    var crumb = Label(text, 16, "Ink", FontWeights.SemiBold);
+                    var crumb = Label(text, 17, "Ink", FontWeights.SemiBold);
                     crumb.Margin = new Thickness(7, 2, 0, 2);
                     crumb.VerticalAlignment = VerticalAlignment.Center;
                     crumb.ToolTip = name;
@@ -482,7 +534,6 @@ namespace DiskBubbles
         {
             if (index < 0 || index >= _trail.Count - 1)
                 return;
-
             OpenLocation(_trail.GetRange(0, index + 1), animate);
         }
 
@@ -504,7 +555,7 @@ namespace DiskBubbles
         private void ChangeLocation(List<DiskEntry> next, bool animate)
         {
             FolderView view = _folderViews.GetValue(_trail[_trail.Count - 1], key => new FolderView());
-            view.MapPage = _map.Page;
+            view.MapStart = _map.PageStart;
             view.Offset = ListingScrollViewer(_entries)?.VerticalOffset ?? 0;
             bool returning = next.Count < _trail.Count;
             var deeper = returning ? _trail : next;
@@ -533,7 +584,6 @@ namespace DiskBubbles
             string path = _rootPath;
             for (int level = 1; level < _trail.Count; level++)
                 path = IOPath.Combine(path, _trail[level].Name);
-
             return path;
         }
 
@@ -542,19 +592,15 @@ namespace DiskBubbles
             if (entry.IsFolder)
             {
                 OpenLocation(new List<DiskEntry>(_trail) { entry });
+                return;
             }
-            else
-            {
-                _entries.SelectedItem = entry;
-                _entries.ScrollIntoView(entry);
-            }
+            _entries.SelectedItem = entry;
+            _entries.ScrollIntoView(entry);
         }
 
         private void UpdateSelection()
         {
-            var entry = _entries.SelectedItem as DiskEntry;
-            _map.SetSelection(entry, _marked.Keys);
-            _mapNote.Visibility = _trail.Count > 0 && _trail[_trail.Count - 1].Children.Count > 0 ? Visibility.Visible : Visibility.Hidden;
+            _map.SetSelection(_entries.SelectedItem as DiskEntry, _marked.Keys);
             UpdateMapCaption();
         }
 
@@ -588,8 +634,7 @@ namespace DiskBubbles
 
         private DiskEntry RowAt(object source)
         {
-            for (var node = source as Visual; node != null && node != _entries;
-                node = VisualTreeHelper.GetParent(node) as Visual)
+            for (var node = source as Visual; node != null && node != _entries; node = VisualTreeHelper.GetParent(node) as Visual)
             {
                 if (node is CheckBox || node is Grid { Name: "MarkArea" })
                     return null;
@@ -603,14 +648,10 @@ namespace DiskBubbles
         {
             if (_entries.SelectedItems.Count != 1 || !(_entries.SelectedItem is DiskEntry entry))
                 return;
-
             if (entry.IsFolder)
-            {
                 OpenLocation(new List<DiskEntry>(_trail) { entry }, animate);
-                return;
-            }
-
-            OpenFileInExplorer(entry);
+            else
+                OpenFileInExplorer(entry);
         }
 
         private ContextMenu BuildBubbleMenu(DiskEntry entry)
@@ -618,24 +659,32 @@ namespace DiskBubbles
             if (_trail.Count == 0 || !NativeDirectoryReader.IsEntryName(entry.Name))
                 return null;
             string path = IOPath.Combine(CurrentPath(), entry.Name);
-            var target = new MarkedEntry { Entry = entry, Parents = _trail.ToArray(), Folder = CurrentPath() };
-            var select = new MenuItem { Header = "Select" };
-            select.Click += (sender, args) =>
+            MarkedEntry target = MarkFor(entry);
+            var menu = new ContextMenu { PlacementTarget = _map, Placement = PlacementMode.MousePoint, FontSize = 14 };
+            if (entry.IsFolder)
+            {
+                var open = new MenuItem { Header = "Open" };
+                open.Click += (sender, args) => Activate(entry);
+                menu.Items.Add(open);
+            }
+            var mark = new MenuItem { Header = entry.IsMarked ? "Unmark" : "Mark for cleanup", IsEnabled = entry.CanRecycle,
+                ToolTip = entry.CanRecycle ? null : SystemProtection.Reason(entry) };
+            mark.Click += (sender, args) =>
             {
                 if (_trail.Count == 0 || !_trail[_trail.Count - 1].Children.Contains(entry)) return;
-                SetMarked(entry, true);
+                SetMarked(entry, !entry.IsMarked);
                 _entries.SelectedItem = entry;
                 LinkEntry(entry);
             };
-            var delete = new MenuItem { Header = "Delete", IsEnabled = entry.CanRecycle,
-                ToolTip = entry.CanRecycle ? "Move this item to the Recycle Bin" : SystemProtection.Reason(entry) };
+            menu.Items.Add(mark);
+            var delete = new MenuItem { Header = "Move to Recycle Bin", IsEnabled = entry.CanRecycle,
+                ToolTip = entry.CanRecycle ? "Move only this item to the Recycle Bin" : SystemProtection.Reason(entry) };
             delete.Click += async (sender, args) => await RecycleAsync(new[] { target }, review: false);
-            var open = new MenuItem { Header = "Open in Explorer", ToolTip = path };
-            open.Click += async (sender, args) => await OpenExplorerPathAsync(path, entry.IsFolder);
-            var menu = new ContextMenu { PlacementTarget = _map, Placement = PlacementMode.MousePoint, FontSize = 14 };
-            menu.Items.Add(select);
             menu.Items.Add(delete);
-            menu.Items.Add(open);
+            menu.Items.Add(new Separator());
+            var explorer = new MenuItem { Header = entry.IsFolder ? "Open in File Explorer" : "Show in File Explorer", ToolTip = path };
+            explorer.Click += async (sender, args) => await OpenExplorerPathAsync(path, entry.IsFolder);
+            menu.Items.Add(explorer);
             return menu;
         }
 
@@ -648,8 +697,7 @@ namespace DiskBubbles
         private async Task OpenExplorerPathAsync(string path, bool folder)
         {
             try { await ExplorerShell.OpenAsync(path, folder, new WindowInteropHelper(this).Handle); }
-            catch (Exception error) when (DiskScanner.IsFileSystemError(error) || error is ArgumentException ||
-                error is System.ComponentModel.Win32Exception || error is System.Runtime.InteropServices.COMException)
+            catch (Exception error) when (RecycleBin.IsItemError(error))
             {
                 if (!_closed)
                     UiVisuals.Notice(this, "Can’t open this location", path + "\n\n" + error.Message).ShowDialog();
@@ -678,13 +726,13 @@ namespace DiskBubbles
             _drive.Visibility = page == _scanning || apps ? Visibility.Collapsed : Visibility.Visible;
             SetActiveMode(_diskMode, !apps);
             SetActiveMode(_appsMode, apps);
+            if (page != _browser)
+                _ambient.Focus(null);
         }
 
         private static string Counts(long files, long folders, long skipped) =>
             $"{CountLabel(files, "file")}  ·  {CountLabel(folders, "folder")}" + (skipped > 0 ? $"  ·  {skipped:N0} skipped" : string.Empty);
 
         private static string CountLabel(long count, string noun) => $"{count:N0} {noun}" + (count == 1 ? "" : "s");
-
-
     }
 }
