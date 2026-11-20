@@ -93,7 +93,8 @@ namespace DiskBubbles
             catch (Exception error) when (IsFileSystemError(error))
             {
             }
-            int workers = workerCount > 0 ? workerCount : Math.Min(8, Environment.ProcessorCount);
+            int workers = workerCount > 0 ? workerCount : NativeDirectoryReader.HasNoSeekPenalty(root.FullName)
+                ? Math.Min(32, Environment.ProcessorCount * 2) : Math.Min(8, Environment.ProcessorCount);
             using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
             using var available = new SemaphoreSlim(0);
             var pending = new ConcurrentQueue<PendingFolder>();

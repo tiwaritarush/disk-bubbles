@@ -136,6 +136,7 @@ internal static class Verification
                 capacityLabel.Text = previousCapacity;
                 capacityMeter.Value = previousMeter;
                 long expected = files.Values.Sum();
+                VerifyScanWorkers(assembly, fixture);
                 Assert((long)root.GetType().GetProperty("Bytes").GetValue(root) == expected, "File sizes did not match the fixture.");
                 Assert((long)result.GetType().GetField("Files").GetValue(result) == files.Count, "File count differed.");
                 if (Directory.Exists(Path.Combine(fixture, "Junction")))
@@ -710,6 +711,33 @@ internal static class Verification
             registered.SetValue(other, false);
             command.SetValue(other, null);
         }
+    }
+
+    private static void VerifyScanWorkers(Assembly assembly, string fixture)
+    {
+        var scan = assembly.GetType("DiskBubbles.DiskScanner").GetMethod("Scan");
+        var serial = scan.Invoke(null, new object[] { fixture, CancellationToken.None, null, 1 });
+        var parallel = scan.Invoke(null, new object[] { fixture, CancellationToken.None, null, 32 });
+        foreach (string field in new[] { "Files", "Folders", "Skipped", "RootPartial" })
+            Assert(Equals(serial.GetType().GetField(field).GetValue(serial), parallel.GetType().GetField(field).GetValue(parallel)),
+                "Parallel scan changed " + field + ".");
+        var root = serial.GetType().GetField("Root");
+        Assert(ScanTree(root.GetValue(serial)).SequenceEqual(ScanTree(root.GetValue(parallel))),
+            "Parallel scan changed folder sizes, contents or protection.");
+        var probe = assembly.GetType("DiskBubbles.NativeDirectoryReader").GetMethod("HasNoSeekPenalty", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert(!(bool)probe.Invoke(null, new object[] { "" }), "Unknown storage was treated as a non-seeking device.");
+    }
+
+    private static IEnumerable<string> ScanTree(object entry, string parent = "")
+    {
+        var type = entry.GetType();
+        string path = parent + "/" + type.GetProperty("Name").GetValue(entry);
+        yield return path + "|" + type.GetProperty("Bytes").GetValue(entry) + "|" + type.GetProperty("Protection", PrivateInstance).GetValue(entry);
+        var children = (IEnumerable)type.GetProperty("Children", PrivateInstance).GetValue(entry);
+        if (children != null)
+            foreach (object child in children.Cast<object>().OrderBy(EntryName, StringComparer.Ordinal))
+                foreach (string item in ScanTree(child, path))
+                    yield return item;
     }
 
     private static async Task CloseAppReview(Window window, Button action, string title, string expectedButton, Action inspect = null)
