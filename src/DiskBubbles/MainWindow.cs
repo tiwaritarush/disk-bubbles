@@ -459,12 +459,12 @@ namespace DiskBubbles
                     var crumb = Label(text, 16, "Ink", FontWeights.SemiBold);
                     crumb.Margin = new Thickness(7, 2, 0, 2);
                     crumb.VerticalAlignment = VerticalAlignment.Center;
-                    crumb.ToolTip = name;
+                    crumb.ToolTip = text == name ? null : name;
                     _crumbs.Children.Add(crumb);
                 }
                 else
                 {
-                    var crumb = new Button { Content = text, ToolTip = name, Style = (Style)FindResource("Crumb") };
+                    var crumb = new Button { Content = text, ToolTip = text == name ? null : name, Style = (Style)FindResource("Crumb") };
                     crumb.Click += (sender, args) => Navigate(level);
                     _crumbs.Children.Add(crumb);
                 }
